@@ -1,4 +1,3 @@
----
-title: "Flux Modeling of Energy Metabolism"
-output: html_document
----
+**Flux Modeling of Energy Metabolism**
+
+

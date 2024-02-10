@@ -1,12 +1,11 @@
 <h1>Flux Modeling of Mammalian Energy Metabolism</h1>
 
----
 
 This repository contains *all* source code and raw data to reproduce figures and computation in the paper **An Organism-Level Quantitative Flux Model of Mammalian Energy Metabolism**. 🌟
 
 The source code is prefixed with numbers **1** to **12**. Run each script sequentially by the prefix. Running each file will generate an associated **.RData** file, which will be imported in the following script.
 
-### 13CO~2~ data analysis
+### 13CO2 data analysis
 
 The raw data from the metabolic cage-isotope analyzer is in folder **data-13CO2**. Experimental parameters are in **data_13CO2_mouseID_paper.xlsx**. 
 

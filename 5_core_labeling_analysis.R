@@ -1,0 +1,1122 @@
+rm(list = ls())
+
+library(ComplexHeatmap)
+library(writexl)
+library(scales) # for color scale
+library(mgcv)
+library(ggpmisc)
+library(ggbeeswarm)
+library(readxl)
+library(RColorBrewer)
+library(viridis)
+library(ggsci)
+library(rebus)
+library(matrixStats)
+library(limSolve)
+library(xlsx)
+library(cowplot)
+library(rstatix)
+library(ggpubr)
+library(broom)
+library(tidyverse)
+
+
+# load workspace
+load("/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/4_core_serum_labeling_import data.RData")
+
+
+# Calculate the adjusted labeling enrichment, standardized to the same infusion rate & same tracer concentration across animals and batches of experiments
+# separately for each tracer, and each phenotype / genotype
+# e.g., glucose concentration infused was around 200 mM but not exactly the same in different experiments; 
+# here we adjust the labeling to 200 mM concentration for 13C-glucose 
+
+d.normalized.tidy = d.normalized.tidy %>%
+  mutate(infusion_mouseID = str_c(infusion_round, "_", mouse_ID)) %>%
+  
+  # total carbon number of each metabolite
+  group_by(Compound) %>% 
+  mutate(C_Label.max = max(C_Label)) %>% ungroup() %>% 
+  mutate(infusion_uL_perMin_g.BW = infusion_uL_perMin / BW) %>% 
+  
+  # combine with the standard infusion parameter database
+  left_join(d.standardInfusionParameters, by = c("infused.tracer", "phenotype")) %>% 
+  
+  # adjust the enrichment in proportion to the infusion rate & tracer concentration normalization/standardization
+  mutate(enrichment = ifelse (C_Label > 0, 
+                              (tracer_conc_mM_Normalize / tracer_conc_mM) *( infusion_uL_perMin_g.BW_Normalize/infusion_uL_perMin_g.BW) * enrichment,
+                              enrichment)) %>% 
+  group_by(infusion_round, sample, Compound) 
+
+# calculate the sum labeling of isotopes M+1, M+2...of each metabolite in each sample,
+# to be subtracted from 1 as the updated parent labeling
+d.normalized.tidy = d.normalized.tidy %>% filter(C_Label > 0) %>% 
+  summarise(enrichment.isotope.sum = sum(enrichment, na.rm = T)) %>% 
+  right_join(d.normalized.tidy) %>% 
+  mutate(enrichment = ifelse(C_Label == 0,  
+                             1 - enrichment.isotope.sum, enrichment) ) %>% 
+  
+  # use the "standardized" concentration and infusion rate: replace the old two columns with new columns using same column name
+  select(-c(tracer_conc_mM, infusion_uL_perMin_g.BW)) %>% 
+  rename(tracer_conc_mM = tracer_conc_mM_Normalize, 
+         infusion_uL_perMin_g.BW = infusion_uL_perMin_g.BW_Normalize) %>% # updated standardized tracer concentration and infusion rate
+  
+  # update into standardized tracer nmol 13C-atoms infused /min/animal
+  mutate(infusion_nmol13C.atoms_perMin.gBW = tracer_conc_mM * infusion_uL_perMin_g.BW * C_Label.max_tracer,
+         infusion_nmol13C.atoms_perMin = infusion_nmol13C.atoms_perMin.gBW * BW, 
+         infusion_uL_perMin = infusion_uL_perMin_g.BW * BW) # update whole body infusion rate as well!
+
+
+
+# Plot infusion parameters
+# d.normalized.tidy %>%
+#   ggplot(aes(x = infused.tracer, y = infusion_uL_perMin_g.BW, color = phenotype)) +
+#   geom_point(position = "jitter", size = .1) + expand_limits(y = 0)
+# 
+# d.normalized.tidy %>%
+#   ggplot(aes(x = infused.tracer, y = infusion_uL_perMin, color = phenotype)) +
+#   geom_point(position = "jitter", size = .1) + expand_limits(y = 0)
+# 
+# d.normalized.tidy %>%
+#   # filter(Compound == infused.tracer) %>%
+#   ggplot(aes(x = infused.tracer, y = infusion_nmol13C.atoms_perMin, color = Compound)) +
+#   geom_point(position = "jitter", size = .5, shape = 21) + expand_limits(y = 0) +
+#   facet_wrap(~phenotype)
+
+
+
+
+# color setup for C-label: same color assignment rule for all Compounds
+# Specify the first seven colors (M+0, ...M + 6)
+colors = c ("grey", "firebrick", "yellow", "turquoise2",  "skyblue2", "steelblue4", "tomato") 
+
+# Labeling equal or higher than M+7 take colors interpolated from palette Dark2, based on max labeling from the input dataset
+colors.more = colorRampPalette(brewer.pal(8, "Pastel1"))( (nmax <- d.corrected.tidy$C_Label %>% as.numeric() %>% max()) - length(colors) + 1)
+colors = c(colors, colors.more)
+names(colors) = 0:nmax %>% factor(ordered = F)
+
+scales::show_col(colors)
+
+# Plot labeling enrichment of metabolites in circulation ====
+flx.plot_labeling_enrichment = function(listed.tidyData = listed.tidyData,
+                                        mylabeled.compound.layer1 = NULL, # labeled metabolite
+                                        enrichment_lower_bound = 0,
+                                        facet.nrow = 1,
+                                        show.TIC = T) {
+  
+  # Check there is listed data input
+  if (is.null(listed.tidyData)) {
+    stop("Please specify the dataset: the output from function \"flx.correct_natural_abundance\", which is in the format of a list.\n\n")
+  }
+  
+  # Extract dataset from the list
+  d.corrected.tidy = listed.tidyData$Corrected
+  d.normalized.tidy = listed.tidyData$Normalized
+  
+  
+  cmpd.all = d.corrected.tidy$Compound %>% unique()
+  
+  # Check there is Compound input
+  if (is.null(mylabeled.compound.layer1 )) {
+    stop("A Compound name must be specified in the argument of \"mylabeled.compound.layer1 = ... \" to make a plot.\n ")
+  }
+  
+  # Check Compound is of length of one
+  if (length(mylabeled.compound.layer1) > 1) {
+    stop("Please input only one Compound in the argument of \"mylabeled.compound.layer1 = ... \" when making a plot.\n\n")
+  }
+  # Check Compound matches Compound names in the input listed.data
+  if (! mylabeled.compound.layer1 %in% cmpd.all) {
+    stop("Compound", " \"", mylabeled.compound.layer1, "\"", " is not found in the input dataset.\n" )
+  }
+  
+  # Convert C-label into factor to visualize in order of labeling 
+  ordered.C_label = d.normalized.tidy $ C_Label %>% unique() %>% rev()
+  d.normalized.tidy$C_Label = factor(d.normalized.tidy $ C_Label, levels = ordered.C_label, ordered = F)
+  d.corrected.tidy$C_Label = factor(d.corrected.tidy$C_Label, levels = ordered.C_label, ordered = F)
+  
+  
+  # Select specified Compound and tidy up
+  d.corrected.tidy = d.corrected.tidy %>% filter(Compound == mylabeled.compound.layer1) 
+  
+  d.TIC.tidy = d.corrected.tidy %>% group_by(sample, Compound) %>%
+    summarise(TIC = sum(intensity, na.rm = T),
+              phenotype = unique(phenotype))
+  
+  d.normalized.tidy = d.normalized.tidy %>%  filter(Compound == mylabeled.compound.layer1) 
+  
+  
+  # max TIC intensity.
+  TIC.max = (d.TIC.tidy)$TIC %>% max(na.rm = T)
+  # Number of color
+  C_label.i = d.normalized.tidy$C_Label %>% unique() %>% as.character()
+  
+  
+  # Define plotting function
+  theme_set(theme_bw() +
+              theme(#axis.text.x = element_text(angle = 45, hjust = 1),
+                strip.background = element_blank(),
+                strip.text = element_text(size = 14, face = "bold"),
+                panel.grid = element_blank(),
+                panel.border = element_rect(colour = "black", size = 1),
+                axis.text = element_text(colour = "black", size = 11),
+                title = element_text(face = "bold", hjust = .5, size = 12),
+                plot.title = element_text(hjust = .5, size = 16),
+                legend.title = element_blank()) )
+  
+  
+  # Label fraction bar plot
+  plt.bar = d.normalized.tidy %>%
+    ggplot(aes(x = sample)) +
+    geom_bar(aes(y = enrichment, fill = C_Label, color = C_Label),
+             stat = "identity", alpha = .8) +
+    
+    scale_color_manual(values = colors [C_label.i %>% as.character()] ) +
+    scale_fill_manual(values = colors [C_label.i %>% as.character()] ) +
+    labs(x = " ", y = "Labelling fraction\n", title = mylabeled.compound.layer1)  + # \n increase y axis - text gap
+    scale_x_discrete(expand = c(0, 0)) +
+    coord_cartesian(ylim = c(enrichment_lower_bound, 1)) +
+    scale_y_continuous(expand = c(0, 0),
+                       # Need this right side axis as place holder
+                       sec.axis = sec_axis(~.*TIC.max, name = "Total isotopologues ion counts\n")) +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1, color = ifelse(show.TIC == F, "black", "white") ),
+          axis.text.y.right = element_text(color = NA),  # turn off TIC axis text
+          axis.title.y.right = element_text(colour = NA),
+          axis.ticks.y.right = element_blank() ) # turn off TIC ticks
+  
+  # TIC line plot
+  plt.TIC = d.TIC.tidy %>%
+    ggplot(aes(x = sample)) +
+    
+    # set bar plot (transparent) so as to keep the legend as a place holder to allow overlay with real bar plot
+    geom_bar(aes(y = TIC),
+             stat = "identity", alpha = 0, color = NA, position = "fill") +
+    
+    labs(x = " ", y = "Labelling fraction\n", title = mylabeled.compound.layer1)  + # \n increase y axis - text gap
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       sec.axis = sec_axis(~.*TIC.max, name = "Total isotopologues ion counts\n")) +
+    
+    theme(panel.background = element_blank(),
+          
+          # turn on bar plot as place holder for legend, but not show legend here
+          # so as to show legend of the bar plot
+          legend.background = element_blank(),
+          legend.key = element_blank(),
+          legend.text = element_blank(),
+          
+          plot.background = element_blank(),
+          axis.ticks.y.left = element_blank(), # turn off label fraction axis ticks
+          axis.text.x = element_text(angle = 60, hjust = 1, colour = "black"),
+          axis.ticks.x = element_blank(),
+          axis.text.y.left = element_text(colour = NA), # turn off label fraction axis text
+          axis.title.y.left = element_text(colour = NA) # turn off label fraction axis title
+    )  +
+    
+    # TIC counts
+    geom_point(aes(y = TIC  / TIC.max), fill = "black", color = "white", alpha = 1, size = 3, shape = 23, stroke = 1 ) 
+  # geom_line(aes(y = TIC  / TIC.max, group = 1), color = "black", alpha = .5)
+  
+  # facet
+  plt.TIC = plt.TIC + facet_wrap( ~ phenotype, scales = "free_x", nrow = facet.nrow) + 
+    theme(panel.spacing = unit(1, "lines"))
+  
+  plt.bar = plt.bar + facet_wrap( ~ phenotype, scales = "free_x", nrow = facet.nrow) + 
+    theme(panel.spacing = unit(1, "lines"))
+  
+  
+  # Overlay and align up the two plots
+  if (show.TIC == T) {
+    aligned_plots <- align_plots(plt.bar, plt.TIC, align="hv", axis="tblr")
+    ggdraw(aligned_plots[[1]]) + draw_plot(aligned_plots[[2]])
+  } else { return(plt.bar)}
+}
+
+# Wrap the above function to visualize labeling of selected tracer, metabolite, and blood
+flx.plot_labeling_enrichment.which.Tracer.Blood = 
+  function(my.infused.tracer = "Glucose", 
+           mylabeled.compound.layer2 = "Glucose",
+           plotBlood = "tail", 
+           enrichment_lower_bound = 0,
+           showTIC = T){
+    
+    listed.tidyData = list(Normalized = d.normalized.tidy %>% filter(infused.tracer == my.infused.tracer & blood == plotBlood), 
+                           Corrected = d.corrected.tidy %>% filter(infused.tracer == my.infused.tracer & blood == plotBlood))
+    
+    p = flx.plot_labeling_enrichment(listed.tidyData = listed.tidyData, 
+                                     mylabeled.compound.layer1 = mylabeled.compound.layer2,
+                                     enrichment_lower_bound = enrichment_lower_bound, show.TIC = showTIC)
+    
+    plot_grid(
+      ggplot() + theme_void() + 
+        ggtitle(paste("Infused tracer: ", my.infused.tracer, "; ", plotBlood, " blood")) +
+        theme(plot.title = element_text(hjust = .4, face = "bold", size = 15, 
+                                        color = ifelse(plotBlood == "art", "firebrick", "steelblue"))),
+      p, 
+      rel_heights = c(1, 15), nrow = 2 
+    ) 
+  }
+
+
+# visualize: labeling of selected metabolite in venous or arterial blood during infusion of selected tracer
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "Lactate", mylabeled.compound = "Lactate",
+  plotBlood = "art", enrichment_lower_bound = .5
+)
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "C16:0", mylabeled.compound = "C16:0",
+  plotBlood = "tail", enrichment_lower_bound = .5
+)
+
+
+
+
+
+# Calculate Fcirc of molecules
+d.Fcirc = d.normalized.tidy %>% ungroup() %>% 
+  filter(Compound == infused.tracer, C_Label == C_Label.max)
+
+
+# Calculate artery-vein blood ratio of full labeled metabolite
+d.art.vs.tail.ratio = d.Fcirc %>% 
+  select(Compound, phenotype, blood, enrichment, infusion_mouseID, infusion_round) %>%
+  spread(key = blood, value = enrichment)
+
+# all glycerol tracing removed as artery blood has been removed after data import
+d.art.vs.tail.ratio = d.art.vs.tail.ratio[complete.cases(d.art.vs.tail.ratio), ] %>% 
+  mutate(correctFactor = art/tail) %>% 
+  mutate(Compound = factor(Compound, levels = ordered.Compound, ordered = F))
+
+# visualize correction factor
+plt.art.tail.correctFactor = d.art.vs.tail.ratio %>%
+  ggplot(aes(x = phenotype, y = correctFactor, color = phenotype)) + 
+  scale_y_continuous(expand = expansion(mult = c(0.2, 0.2))) + 
+  geom_beeswarm(size = 3, alpha = .5, cex = 5) +
+  
+  # geom_text(aes(label = infusion_mouseID)) +
+  # expand_limits(y = 1) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  facet_wrap(~Compound, scales = "free_y", nrow = 2) +
+  stat_summary(fun.data = mean_se, fun.args = list(mult = 1),
+               geom = "errorbar", width = .3, size = .6) +
+  stat_summary(fun = mean, fun.args = list(mult = 1),
+               geom = "crossbar", width = .3, size = .5) +
+  
+  labs(y = "Correction factor\n",
+       title = "Vein uniform enrich x correct factor = artery enrich\nmean ± SEM") + 
+  theme.mybw +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+        axis.title.x = element_blank(), legend.position = "None") +
+  scale_color_manual(values = color.phenotype)
+
+plt.art.tail.correctFactor 
+
+
+
+
+
+# Check A-V ratio (uniform labeled) in detail
+func.plt.tail.vs.art = function(data = d.normalized.tidy,  
+                                myCompound.infused, myCompound.labeled, 
+                                yAxis.input = "enrichment.normalized") {
+  data %>%
+    filter(infused.tracer == myCompound.infused) %>%
+    filter(Compound == myCompound.labeled) %>%
+    filter(C_Label == C_Label.max) %>% 
+    ggplot(aes_string(x = "blood", y = yAxis.input)) +
+    geom_point() +
+    geom_line(aes(group = infusion_mouseID)) +
+    facet_wrap(~phenotype) +
+    labs(title = paste("Infused tracer:", myCompound.infused), 
+         y = paste( ifelse(yAxis.input == "enrichment.normalized", 
+                           "Normalized enrichment (%) of", "Enrichment (%) of"), myCompound.labeled) ) +
+    scale_y_continuous(labels = function(x){x*100})
+}
+
+func.plt.tail.vs.art(data = d.normalized.tidy,
+                     myCompound.infused = "3-HB", 
+                     myCompound.labeled = "3-HB", yAxis.input = "enrichment")
+
+# func.plt.tail.vs.art(data = d.normalized.tidy ,
+#                      myCompound.infused = "Glucose", myCompound.labeled = "Glucose", yAxis.input = "enrichment")
+# 
+# 
+# func.plt.tail.vs.art(data = d.normalized.tidy ,
+#                      myCompound.infused = "Glutamine", myCompound.labeled = "Glutamine", yAxis.input = "enrichment")
+# 
+# func.plt.tail.vs.art(data = d.normalized.tidy ,
+#                      myCompound.infused = "Alanine", myCompound.labeled = "Alanine", yAxis.input = "enrichment")
+# 
+# func.plt.tail.vs.art(data = d.normalized.tidy ,
+#                      myCompound.infused = "Glycerol", myCompound.labeled = "Glycerol", yAxis.input = "enrichment")
+# 
+# func.plt.tail.vs.art(data = d.normalized.tidy ,
+#                      myCompound.infused = "3-HB", myCompound.labeled = "3-HB", yAxis.input = "enrichment")
+# 
+# func.plt.tail.vs.art(data = d.normalized.tidy ,
+#                      myCompound.infused = "C16:0", myCompound.labeled = "C16:0", yAxis.input = "enrichment")
+
+
+
+# A-V correction factor mean value
+d.art.vs.tail.ratio.summary = d.art.vs.tail.ratio %>%
+  group_by(Compound, phenotype) %>%
+  summarise(correctFactor.mean = mean(correctFactor),
+            n.replicate = n_distinct(infusion_mouseID),
+            correctFactor.SEM = sd(correctFactor) / sqrt(n.replicate) )
+d.art.vs.tail.ratio.summary 
+
+# export summary statistics as table: full label ratio of artery vs. vein
+d.art.vs.tail.ratio.summary.output =  d.art.vs.tail.ratio.summary %>%
+  mutate(ratio = str_c(correctFactor.mean %>% round(2), " ± ",
+                       correctFactor.SEM %>% round(2), " (", n.replicate, ")")) %>%
+  select(Compound, phenotype, ratio) %>%
+  spread(Compound, ratio) 
+
+# output organized molecular A-V ratio
+# write.xlsx(d.art.vs.tail.ratio.summary.output %>% as.data.frame(), 
+#            file = "/Users/boyuan/Desktop/Harvard/Research/db db mice/Infusion data/A-V ratio_raw.xlsx", 
+#            sheetName = "Molecule ratio", append = T)
+
+
+# read manually organized molecular A-V ratio
+d.art.vs.tail.ratio.summary = read_excel("/Users/boyuan/Desktop/Harvard/Research/db db mice/Infusion data/A-V ratio.xlsx", sheet = "Molecular ratio") %>% 
+  gather(-phenotype, key = Compound, value = correctFactor.mean)  
+
+
+
+# Use labeling preferentially only from artery blood; 
+# if art not available, use tail blood, corrected with A-V ratio
+d.Fcirc = d.Fcirc %>% select(-sample) %>% ungroup() %>% 
+  spread(key = blood, value = enrichment) %>% 
+  mutate(enrich = ifelse(is.na(art), tail, art), blood = ifelse(is.na(art), "tail", "art")) %>%  # if art not available, use tail blood (later corrected with A-V ratio)
+  mutate(enrich = ifelse(is.na(enrich), art, enrich), blood = ifelse(is.na(blood), "art", blood)) %>%  # a few samples tail blood not available, and therefore use artery blood
+  select(-c(art, tail))
+
+# Calculate Fcirc using artery blood, and corrected-tail blood if artery blood is not available
+d.Fcirc = d.Fcirc %>% 
+  left_join(d.art.vs.tail.ratio.summary, by = c("Compound", "phenotype"))
+
+
+# add new column of corrected tail blood for full labeled isotopomer; # for art blood: enrichment = enrich.corrected
+d.Fcirc = d.Fcirc %>% 
+  mutate(enrich.corrected = ifelse(blood == "art", enrich, enrich * correctFactor.mean)) %>% 
+  select(-enrich)
+
+
+
+# now calculate Fcirc, in unit of nmol / min; 
+# at this step, both A-V sample pairs are included in this dataset; 
+# later only artery blood if available is shown, or use corrected tail blood if artery blood is not available
+d.Fcirc = d.Fcirc %>%
+  mutate(Fcirc_animal = infusion_uL_perMin * tracer_conc_mM * (1-enrich.corrected) / enrich.corrected,
+         Fcirc_g.BW = Fcirc_animal / BW)
+
+
+
+
+#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~
+
+
+
+
+
+# Scrambled carbon atom enrichment =========
+d.normalized.tidy = d.normalized.tidy %>% ungroup() %>% 
+  mutate(enrich.isotopomer.contri = C_Label / C_Label.max * enrichment) 
+
+d.enrich.atom = d.normalized.tidy %>% 
+  group_by(Compound, infused.tracer,  sample, mouse_ID, infusion_round, blood, phenotype, infusion_mouseID) %>%
+  summarise(enrich.atom = sum(enrich.isotopomer.contri, na.rm = T))
+
+
+
+# calculate A-V enrichment ratio
+d.enrich.atom = d.enrich.atom %>% 
+  ungroup() %>% select(-sample) %>% 
+  # since both A-V columns are from the same mouse - infusion round, sample column needs to be removed
+  spread(key = blood, value = enrich.atom) %>% 
+  mutate(correctFactor.atom = art / tail)
+
+d.art.vs.tail.ratio.atom =  d.enrich.atom[complete.cases(d.enrich.atom), ] %>% 
+  filter(is.finite(correctFactor.atom)) %>% # remove outliers
+  filter(correctFactor.atom >= 0)
+
+
+# remove outliers from 3 tracers in lean and obese mice
+d.art.vs.tail.ratio.atom = d.art.vs.tail.ratio.atom %>% 
+  filter(! (infusion_mouseID == "L_L6" & Compound == "Alanine")) %>%
+  filter(! (infusion_mouseID == "m_L5" & Compound == "Alanine")) %>%
+  filter(! (infusion_mouseID == "h_O2" & Compound == "Alanine")) %>%
+  filter(! (infusion_mouseID == "h_O3" & Compound == "Alanine")) %>% 
+  filter(! (infusion_mouseID == "m_d5" & Compound == "Glutamine")) %>%
+  filter(! (infusion_mouseID == "m_L5" & Compound == "Glutamine")) %>%
+  filter(! (infusion_mouseID == "k_O3" & Compound == "Glutamine")) %>%
+  filter(! (infusion_mouseID == "k_d4" & Compound == "Glucose")) %>% 
+  filter(! (infusion_mouseID == "ad_L8" & Compound == "Lactate"))
+
+
+# Visualize A-V ratio in atomized labeling enrichment
+func.plt.ratio.atom = function(labeled.Compound = "Glucose"){
+  
+  d.art.vs.tail.ratio.atom.selectedCompounds =  d.art.vs.tail.ratio.atom %>% 
+    filter(infused.tracer %in% c("Glucose", "Lactate", "Alanine", "Glutamine")) %>% 
+    filter(Compound %in% c("Glucose", "Lactate", "Alanine", "Glutamine", "Glycerol", "3-HB", "Acetate", "C16:0")) %>% 
+    # show facet panels in order of infused tracer
+    mutate(infused.tracer = factor(infused.tracer, levels =  ordered.Compound, ordered = F))
+  
+  
+  d.art.vs.tail.ratio.atom.selectedCompounds %>% 
+    # plot designated Compound across different infused tracers
+    filter(Compound == labeled.Compound) %>% 
+    
+    ggplot(aes(x = phenotype, y = correctFactor.atom, color = phenotype, fill = phenotype)) +
+    geom_hline(yintercept = 1, linetype = "dashed",  color = "steelblue") +
+    geom_beeswarm(alpha = .3, size = 2, cex = 6) +
+    geom_beeswarm(alpha = 1, size = 2, cex = 6, fill = NA, shape = 21) +
+    # geom_text(aes(label = infusion_mouseID)) +
+    # stat_summary(fun = mean, geom = "crossbar", width = .8) +
+    # stat_summary(fun.data = mean_se, fun.args = list(mult = 1),
+    #              size = .4) +
+    stat_summary(fun.data = mean_se, fun.args = list(mult = 1),
+                 geom = "errorbar", width = .3, size = .6) +
+    stat_summary(fun = mean, fun.args = list(mult = 1),
+                 geom = "crossbar", width = .3, size = .5) +
+    
+    facet_wrap( ~infused.tracer, scales = "free", nrow = 1) +
+    scale_y_continuous(expand = expansion(mult = c(.1, .1))) +
+    theme.mybw + theme(axis.title.x = element_blank(), axis.text.x = element_blank(),
+                       axis.ticks.length.x = unit(-.1, "cm"),
+                       plot.title = element_text(hjust = .5),
+                       strip.text = element_text(size = 11),
+                       panel.spacing = unit(1, "lines"),
+                       strip.placement = "outside") +
+    labs(y = labeled.Compound) +
+    scale_color_manual(values = color.phenotype) +
+    scale_fill_manual(values = color.phenotype) 
+}
+
+# Vein blood atomized enrich x correct factor = art atomized enrich, mean ± SEM"
+# left : labeled Compound; top strip: infused tracer
+plt.art.tail.correctFactor.atomized = 
+  plot_grid(func.plt.ratio.atom("Glucose") + coord_cartesian(ylim = c(.9, 1.2)),
+            func.plt.ratio.atom("Lactate") + coord_cartesian(ylim = c(1, 2.5)),
+            func.plt.ratio.atom("Alanine") + coord_cartesian(ylim = c(.8, 2)),
+            func.plt.ratio.atom("Glutamine") + coord_cartesian(ylim = c(.9, 1.4)),
+            nrow = 4
+  )
+plt.art.tail.correctFactor.atomized
+
+
+
+
+
+# Summary of atomized ratio * important dataset
+d.art.vs.tail.ratio.atom.summary = d.art.vs.tail.ratio.atom %>% 
+  group_by(infused.tracer, Compound, phenotype) %>% 
+  summarise(correctFactor.atom.mean = mean(correctFactor.atom, na.rm = T),
+            n.replicate = n_distinct(infusion_mouseID),
+            correctFactor.atom.SEM = sd(correctFactor.atom, na.rm = T) / sqrt(n.replicate) )
+
+
+
+
+#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-
+
+
+
+
+
+# export summary statistics for publication
+d.art.vs.tail.ratio.atom.summary.paper = d.art.vs.tail.ratio.atom.summary %>% 
+  filter(infused.tracer %in% c("Glucose", "Lactate", "Alanine", "Glutamine" )) %>% 
+  filter(Compound %in% c("Glucose", "Lactate", "Alanine", "Glutamine")) %>% 
+  mutate(atomized.ratio = str_c(correctFactor.atom.mean %>% round(digits = 2), " ± ",  
+                                correctFactor.atom.SEM %>% round(digits = 2),
+                                " (", n.replicate, ")")) %>% 
+  select(infused.tracer, Compound, phenotype, atomized.ratio) %>% 
+  spread(Compound, atomized.ratio) %>% 
+  select(infused.tracer, phenotype, Glucose, Lactate, Alanine, Glutamine) %>% 
+  mutate(infused.tracer = factor(infused.tracer, levels = ordered.Compound, ordered = F)) %>% arrange(infused.tracer) 
+
+d.art.vs.tail.ratio.atom.summary.paper 
+
+
+
+# Visualize the A-V atomized labeling enrichment as a heatmap
+kkk = d.art.vs.tail.ratio.atom.summary %>% 
+  filter(Compound %in% c("Glucose", "Lactate", "Glutamine", "Alanine", "Glycerol")) %>% 
+  mutate(infused.tracer = factor(infused.tracer, levels = ordered.Compound, ordered = F ),
+         Compound = factor(Compound, levels = ordered.Compound, ordered = F),
+         phenotype = factor(phenotype, levels = c("WT", "ob/ob", "db/db"), ordered = F)) %>% 
+  arrange(Compound, phenotype) %>% 
+  mutate(Compound_phenotype = str_c(Compound, ", ", phenotype))
+
+kkk$Compound_phenotype = factor(kkk$Compound_phenotype, levels = unique(kkk$Compound_phenotype) %>% rev(), ordered = F)
+
+kkk.selected = kkk %>% 
+  filter(Compound %in% c("Glucose", "Lactate", "Glutamine", "Alanine")) %>% 
+  filter(infused.tracer %in% c("Glucose", "Lactate", "Glutamine", "Alanine"))
+
+plt.art.tail.correctFactor.atomized.heatmap = 
+  kkk.selected %>% 
+  ggplot(aes(x = infused.tracer, y = Compound_phenotype, fill = correctFactor.atom.mean)) +
+  geom_tile(linetype = 1, color = "white", size = .7) +
+  geom_text(data = kkk.selected, aes(label = round(correctFactor.atom.mean, 2)), color = "snow1",  fontface = "bold") +
+  geom_text(data = kkk.selected %>% filter(correctFactor.atom.mean >= 1.9),
+            aes(label = round(correctFactor.atom.mean, 2)), color = "black", fontface = "bold") +
+  # scale_fill_gradient(low = "white", high = "firebrick") +
+  # scale_fill_gradient2(low = "steelblue", mid = "white", high = "brown",
+  #                      midpoint = .9, 
+  #                      breaks = seq(1, 2, .2), name = "") +
+  scale_fill_viridis(option = "A") +
+  scale_x_discrete(expand = expansion(mult = c(0, 0))) +
+  scale_y_discrete(expand = expansion(mult = c(0, 0)))   +
+  theme.mybw  + theme(legend.key.height = unit(1.2, "cm"), legend.title = element_blank()) +
+  labs(y = "labeled metabolite\n", x = "infused tracer",
+       title = "A-V Correction factor\nvein enrichment * factor = artery enrichment") 
+
+plt.art.tail.correctFactor.atomized.heatmap
+
+
+
+
+# Output the A-V ratio of the gluconeogenic set compound; manually set ratio = 1 for fatty acid + acetate series
+setwd("/Users/boyuan/Desktop/Harvard/Research/db db mice/Infusion data")
+
+d.art.vs.tail.ratio.atom.summary.output = 
+  d.art.vs.tail.ratio.atom.summary %>% 
+  filter(Compound %in% ordered.gluconeogenic.Set[-3]) %>% 
+  filter(infused.tracer %in% ordered.gluconeogenic.Set[-3]) %>%
+  select(infused.tracer, Compound, phenotype, correctFactor.atom.mean) %>% 
+  spread(Compound, correctFactor.atom.mean)
+
+write.xlsx(d.art.vs.tail.ratio.atom.summary.output %>% as.data.frame(), 
+           file = "A-V ratio_raw.xlsx", sheetName = "Gluconeogenic set")
+write.xlsx(d.art.vs.tail.ratio.atom.summary.paper %>% as.data.frame(), 
+           file = "A-V ratio_raw.xlsx", sheetName = "Gluconeogenic set_stats", append = T)
+
+
+
+# import manually organized A-V ratio dataset
+d.A.V.ratio.allSet = read_excel("/Users/boyuan/Desktop/Harvard/Research/db db mice/Infusion data/A-V ratio.xlsx")
+d.A.V.ratio.allSet.tidy = d.A.V.ratio.allSet %>% 
+  gather(-c(1:2), key = Compound, value = correctFactor.atom.mean )
+
+
+# Fcirc based on carbon atoms
+d.enrich.atom = d.enrich.atom %>% 
+  
+  # correctFactor.atom is specific to each A-V sample pair, 
+  # already used above to calculate the mean A-V ratio, no longer useful, thus removed here
+  select(-correctFactor.atom) %>% 
+  
+  left_join(d.A.V.ratio.allSet.tidy, 
+            by = c("infused.tracer", "Compound", "phenotype")) %>% 
+  mutate(tail.corrected = tail * correctFactor.atom.mean) %>% 
+  
+  # when art blood is available, only use artery blood enrichment without correction;
+  # otherwise use A-V ratio-corrected tail venous blood; and integrate both A and V blood into single column
+  # NOTE that enrich.atom.corrected includes: original arterial blood enrichment, or venous blood enrichment after A-V ratio correction
+  mutate(enrich.atom.corrected = ifelse(!is.na(art), art, tail.corrected)) %>% 
+  select(-c(art, tail, tail.corrected))
+
+
+
+d.Fcirc.standard.atom = d.enrich.atom %>% 
+  filter(infused.tracer == Compound) %>% 
+  # left_join(d.infusion_rounds, by = c("infusion_round", "mouse_ID", "infused.tracer")) %>% 
+  left_join(d.Fcirc, by = c("Compound",  "infused.tracer",  "mouse_ID", "infusion_round", "infusion_mouseID", "phenotype")) %>% 
+  mutate(Fcirc_atom.animal = tracer_conc_mM * infusion_uL_perMin * C_Label.max * (1-enrich.atom.corrected) / enrich.atom.corrected, # nmol carbon atoms / min/animal
+         Fcirc_atom.g.BW = Fcirc_atom.animal / BW) # nmol carbons atoms/min/g BW
+
+# Mark mice ID that has both tail venous and art blood; use only art blood in this case
+infusion_mouseID.havingBoth_art_tail = d.art.vs.tail.ratio$infusion_mouseID # (or use d.art.vs.tail.ratio.atom data)
+d.Fcirc.standard.atom = d.Fcirc.standard.atom  %>% 
+  mutate(both.art.tail = infusion_mouseID %in% infusion_mouseID.havingBoth_art_tail)
+
+d.Fcirc.standard.atom_art.or.tail = d.Fcirc.standard.atom %>% 
+  filter(! (both.art.tail == T & blood == "tail"))
+
+# summary stats
+d.Fcirc_standard.atom.summary = d.Fcirc.standard.atom_art.or.tail %>% # filter(Compound == "3-HB")
+  group_by(Compound, phenotype) %>%
+  summarise( 
+    n.rep = n_distinct(infusion_mouseID),
+    Fcirc_animal.mean = mean(Fcirc_animal, na.rm = T),
+    Fcirc_animal.sd = sd(Fcirc_animal, na.rm = T),
+    
+    Fcirc_g.BW.mean = mean(Fcirc_g.BW, na.rm = T),
+    Fcirc_g.BW.sd = sd(Fcirc_g.BW, na.rm = T),
+    Fcirc_g.BW.sem = Fcirc_g.BW.sd / sqrt(n.rep),
+    
+    Fcirc_animal.atom.mean = mean(Fcirc_atom.animal, na.rm = T),
+    Fcirc_animal.atom.sd = sd(Fcirc_atom.animal, na.rm = T),
+    
+    Fcirc_g.BW.atom.mean = mean(Fcirc_atom.g.BW, na.rm = T),
+    Fcirc_g.BW.atom.sd = sd(Fcirc_atom.g.BW, na.rm = T) )
+
+d.Fcirc_standard.atom.summary[, 1:5] %>% 
+  mutate(Fcirc_animal.sd / Fcirc_animal.mean * 100)
+
+
+
+
+# plot Fcirc
+d.Fcirc.standard.atom_art.or.tail = d.Fcirc.standard.atom_art.or.tail %>%  # plot in order of infused tracer
+  mutate(infused.tracer = factor(infused.tracer, levels = ordered.Compound, ordered = F ))
+
+func.plt.Fcirc.Compound = function(yAxis = "Fcirc_animal") {
+  d.Fcirc.standard.atom_art.or.tail %>% 
+    # filter(infused.tracer == "C18:2") %>% 
+    # filter(infused.tracer == "Glutamine") %>% 
+    mutate(phenotype = factor(phenotype, levels = ordered.phenotype, ordered = F)) %>% 
+    filter(phenotype %in% c("WT", "ob/ob", "HFD")) %>% 
+    ggplot(aes_string(x = "phenotype", y = yAxis, color = "phenotype", fill = "phenotype")) +
+    
+    stat_summary(fun = mean, fun.args = list(mult = 1),
+                 geom = "bar", width = 1, color = "black") +
+    
+    stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1),
+                 geom = "errorbar",width = .5, color = "black") +
+    
+    geom_beeswarm(size = 1.5, cex = 3, alpha = 1, show.legend = F,
+                  fill = "white", color = "black", shape = 21 ) + # base layer
+    geom_beeswarm(size = 1.5, cex = 3,  shape = 21,
+                  alpha = .4, show.legend = F, color = "black" ) + # top layer
+    
+    # geom_text(aes(label = infusion_mouseID), size = 5, color = "black",
+    #           position = position_jitter(.2, 0)) +
+    
+    facet_wrap(~infused.tracer, scales = "free", nrow = 2) +
+    labs() + theme.myClassic +
+    theme(axis.title.x = element_blank(),
+          axis.ticks.length.x = unit(-0.1, "cm"),
+          
+          legend.title = element_blank(),
+          axis.text.x = element_blank(),
+          panel.spacing = unit(10, "mm")
+    ) +
+    expand_limits(y = 0) +
+    scale_y_continuous(expand = expansion(mult = c(0, .4))) +
+    scale_color_manual(values = color.phenotype) +
+    scale_fill_manual(values = color.phenotype,
+                      labels = function(x){str_replace(x, "WT", "chow")})  +
+    scale_x_discrete(expand = expansion(mult = c(.5, .5))) 
+}
+
+
+plt.Fcirc.perGram_BW = func.plt.Fcirc.Compound(yAxis = "Fcirc_g.BW") 
+plt.Fcirc_animal = func.plt.Fcirc.Compound(yAxis = "Fcirc_animal") +
+  labs(y = "nmol molecules / min /animal\n")
+
+plt.Fcirc_animal
+
+ggsave(filename = "molecule Fcirc.pdf",
+       device = "pdf",
+       plot = plt.Fcirc_animal + theme(legend.position = "bottom"),
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 5.5, width = 9)
+
+# plt.Fcirc_animal + theme(panel.spacing.y = unit(20, "pt"))
+
+
+plt.Fcirc.perGram_BW.atom = func.plt.Fcirc.Compound(yAxis = "Fcirc_atom.g.BW") 
+plt.Fcirc_animal.atom = func.plt.Fcirc.Compound(yAxis = "Fcirc_atom.animal") 
+
+
+plt.Fcirc = plot_grid(plt.Fcirc.perGram_BW + labs(y = "nmol molecules / min / g" ),
+                      plt.Fcirc_animal + labs(y = "nmol molecules / min / animal" ) , nrow = 2)
+# plt.Fcirc
+
+plt.Fcirc.atom = plot_grid(plt.Fcirc.perGram_BW.atom + labs(y = "nmol C-atoms / min / g" ), 
+                           plt.Fcirc_animal.atom  + labs(y = "nmol C-atoms / min / animal" ), nrow = 2)
+# plt.Fcirc.atom
+
+
+d.Fcirc.standard.atom_art.or.tail %>% 
+  group_by(Compound, phenotype) %>% 
+  summarise(Fcirc_g.BW.mean = mean(Fcirc_g.BW)) # %>% view()
+
+
+
+# add significant stars
+d.pairwise.T.Fcirc.molecule.animal <-  d.Fcirc.standard.atom_art.or.tail %>% 
+  filter(! infused.tracer %in% c("3-HB", "C18:2")) %>% 
+  # filter(infused.tracer == "Glycerol") %>% 
+  mutate(phenotype = factor(phenotype, levels = ordered.phenotype, ordered = F)) %>% 
+  filter(phenotype %in% c("WT", "ob/ob", "HFD")) %>% 
+  select(infused.tracer, phenotype, Fcirc_animal )
+
+
+d.pairwise.T.Fcirc.molecule.animal.stats <-  d.pairwise.T.Fcirc.molecule.animal %>% 
+  group_by(infused.tracer) %>% 
+  pairwise_t_test(Fcirc_animal ~ phenotype, paired = F, 
+                  p.adjust.method = "bonferroni") %>% 
+  select(-c(n1, n2, p, p.signif)) %>% 
+  add_xy_position(x = "phenotype") 
+
+
+d.pairwise.T.Fcirc.molecule.animal.stats %>% 
+  filter(p.adj < 0.05)
+
+d.pairwise.T.Fcirc.molecule.animal.stats %>% 
+  filter(infused.tracer == "Glutamine")
+
+
+# Plot bar plot of accumulated carbon atoms
+# Calculate the y-axis position of accumulated error bar
+func.cumulatedSum = function(vector){
+  cc = vector()
+  for (i in length(vector):1){ cc[i] <- sum(vector[length(vector):i]) }
+  return(cc)
+}
+
+
+d.Fcirc_standard.atom.summary = d.Fcirc_standard.atom.summary %>% 
+  mutate(Compound = factor(Compound, levels = ordered.Compound %>% rev(), ordered = F)) %>% 
+  arrange(Compound) %>% 
+  group_by(phenotype) %>% 
+  mutate(position.y.error_Fcic.g.BW.atom = func.cumulatedSum(Fcirc_g.BW.atom.mean),
+         position.y.error_Fcic.animal.atom = func.cumulatedSum(Fcirc_animal.atom.mean))
+
+# plot 
+func.plt.Fcirc.atom.bar = function(yAxis){
+  p = d.Fcirc_standard.atom.summary %>% 
+    mutate(phenotype = factor(phenotype, levels = ordered.phenotype)) %>% 
+    filter(phenotype != "db/db") %>% 
+    ggplot(aes_string(x = "phenotype", y = yAxis, fill = "Compound")) +
+    geom_bar(stat = "identity", position = "stack", alpha = .7,color = "black") +
+    scale_y_continuous(expand = expansion(mult = c(0, .1))) +
+    # scale_color_nejm() +
+    # scale_fill_nejm() +
+    theme.mybw + 
+    theme(axis.title.x = element_blank(), 
+          legend.title = element_blank()) +
+    scale_x_discrete(expand = expansion(add = .8),
+                     labels = function(x){str_replace(x, "WT", "chow")})
+  
+  if (yAxis == "Fcirc_animal.atom.mean") { 
+    p = p + geom_errorbar(aes(ymin =  position.y.error_Fcic.animal.atom - Fcirc_animal.atom.sd,
+                              ymax =  position.y.error_Fcic.animal.atom ),
+                          width = .2) +
+      labs(y = "nmol C-atoms / min / animal") 
+  }
+  
+  if (yAxis == "Fcirc_g.BW.atom.mean") { 
+    p = p + geom_errorbar(aes(ymin =  position.y.error_Fcic.g.BW.atom - Fcirc_g.BW.atom.sd,
+                              ymax =  position.y.error_Fcic.g.BW.atom ),
+                          width = .2)  +
+      labs(y = "nmol C-atoms / min / g BW") 
+  } 
+  return(p)
+}
+p1 = func.plt.Fcirc.atom.bar(yAxis = "Fcirc_g.BW.atom.mean" )
+p2 = func.plt.Fcirc.atom.bar(yAxis = "Fcirc_animal.atom.mean")
+plt.Fcirc.atom.bar = plot_grid(p1, p2, nrow = 1)
+plt.Fcirc.atom.bar
+
+
+
+
+#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~#~~~
+
+
+
+# normalized labeling 
+d.enrich.atom = d.enrich.atom %>% 
+  mutate(infused.tracer = factor(infused.tracer, levels = ordered.Compound, ordered = F),
+         Compound = factor(Compound, levels = ordered.Compound, ordered = F))
+
+d.enrich.atom.selected = d.enrich.atom %>% 
+  filter(Compound %in% ordered.Compound[c(1:6, 8:11)]) %>% 
+  filter(infused.tracer %in% ordered.Compound[c(1:6, 8:11)]) %>% 
+  select(-c(correctFactor.atom.mean))
+
+myCompounds = d.enrich.atom.selected$Compound %>% unique()
+names(myCompounds) = myCompounds
+
+
+# myCompounds = "Glucose"
+d.enrich.atom.normalized = tibble()
+
+for (tracer in myCompounds) {
+  # select each infused tracer
+  d.i = d.enrich.atom.selected %>% 
+    filter(infused.tracer == tracer) %>% 
+    spread(Compound, enrich.atom.corrected)
+  
+  # add tracer enrich column
+  d.i = d.i %>% mutate(tracer = d.i[[tracer]]) 
+  
+  # normalize each labeled metabolite
+  for (Compound.i in myCompounds){
+    c.i = d.i[[Compound.i]] / d.i[[tracer]]
+    d.i = cbind(d.i, c.i) %>% as_tibble()
+    colnames(d.i)[ncol(d.i)] = paste0(Compound.i, "_norm")
+  }
+  d.enrich.atom.normalized = rbind(d.enrich.atom.normalized, d.i)
+}
+
+d.enrich.atom.normalized = d.enrich.atom.normalized %>% 
+  select(infused.tracer,phenotype, infusion_mouseID, contains("norm"))
+
+d.enrich.atom.normalized.tidy = d.enrich.atom.normalized %>% 
+  gather(-c(infused.tracer, phenotype, infusion_mouseID), key = Compound, value = enrich.normalized) %>% 
+  mutate(Compound = str_remove(Compound, pattern = "_norm")) %>% 
+  filter(enrich.normalized <=1) %>% 
+  mutate(Compound = factor(Compound, levels = ordered.Compound, ordered = F))
+
+# summary
+d.enrich.atom.normalized.summary = d.enrich.atom.normalized.tidy %>% 
+  group_by(phenotype, infused.tracer, Compound) %>% 
+  summarise(enrich.normalized.mean = mean(enrich.normalized, na.rm = T ),
+            enrich.normalized.sd = sd(enrich.normalized, na.rm = T),
+            # calculate standard error
+            n.replciate = n_distinct(infusion_mouseID),
+            enrich.normalized.sem = enrich.normalized.sd / sqrt(n.replciate)) 
+d.enrich.atom.normalized.summary
+
+d.enrich.atom.normalized.summary$infused.tracer %>% unique()
+
+
+# Normalized labeling
+plt.labeling.normalized = 
+  d.enrich.atom.normalized.summary %>% 
+  # filter(phenotype != "db/db") %>% 
+  
+  # filter(Compound %in% c("Glucose", "Lactate", "Glycerol")) %>% 
+  ggplot(aes(x = Compound, y = enrich.normalized.mean, fill = phenotype, color = phenotype)) +
+  geom_col(alpha = .4, position = "dodge", width = .8) +
+  facet_wrap(~infused.tracer, nrow = 4) +
+  geom_errorbar(aes(ymin = enrich.normalized.mean - enrich.normalized.sd,
+                    ymax = enrich.normalized.mean + enrich.normalized.sd), 
+                size = 1, width = .5, position = position_dodge(.8)) +
+  
+  # geom_point(data = d.enrich.atom.normalized.tidy %>%
+  #              filter(infused.tracer == Compound & phenotype != "db/db"), # & Compound != infusedTracer
+  #            aes(y = enrich.normalized),  alpha = .6, position = position_dodge(0)) +
+  # 
+  # geom_point(data = d.enrich.atom.normalized.tidy %>%
+  #              filter(infused.tracer != Compound& phenotype != "db/db"), # & Compound != infusedTracer
+  #            aes(y = enrich.normalized),  alpha = .6,  position = position_dodge(.8)) +
+  
+  labs(title = "Normalized labeling by infused tracer", 
+       x = "\nLabeled metabolite", 
+       y = paste("Normalized labeling \n" )) +
+  scale_color_manual(values = color.phenotype, labels = function(x){str_replace(x, "WT", "chow")}) +
+  scale_fill_manual (values = color.phenotype, labels = function(x){str_replace(x, "WT", "chow")}) +
+  scale_y_continuous(expand = expansion(mult = c(0, .05)), 
+                     breaks = seq(0, 1, .2)) +
+  coord_cartesian(ylim = c(0, NA)) +
+  theme.myClassic + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        axis.ticks.length.x = unit(-.1, "cm"),
+        panel.spacing = unit(.5, "lines"),
+        strip.text = element_text(size = 13),
+        legend.position = c(.8, .04))
+
+
+plt.labeling.normalized <- plt.labeling.normalized +
+  geom_point(data = d.enrich.atom.normalized.tidy, # %>% filter(phenotype != "db/db"),
+             aes(y = enrich.normalized,  x = Compound),
+             position = position_dodge(.8)) # +
+# coord_cartesian(ylim = c(0, .4)) +
+# geom_hline(yintercept = .2) 
+
+plt.labeling.normalized   
+# scale_y_continuous(expand = expansion(mult = c(0, .01)),
+#                    breaks = seq(0, .04, .005)) +
+# coord_cartesian(ylim = c(0, .01))
+
+
+# heatmap
+d.enrich.atom.normalized.summary = d.enrich.atom.normalized.summary %>% 
+  mutate(tracer.pheno = str_c(phenotype, " ", infused.tracer)) %>% 
+  arrange(infused.tracer, phenotype)
+
+# put in current order
+d.enrich.atom.normalized.summary$tracer.pheno = 
+  factor(d.enrich.atom.normalized.summary$tracer.pheno,
+         levels = d.enrich.atom.normalized.summary$tracer.pheno %>% unique() %>% rev(), 
+         ordered = F)
+
+# plot
+color.enrich = c(viridis::viridis(20, option = "F"), "ivory") %>% rev()
+# color.enrich %>% scales::show_col()
+
+plt.heatmap.normalized.enrich = d.enrich.atom.normalized.summary %>%  # good
+  filter(phenotype != "db/db") %>% 
+  ggplot(aes(x = Compound, y = tracer.pheno, fill = enrich.normalized.mean)) +
+  geom_tile(color = "white") +
+  # scale_fill_viridis_c(option = "F", direction = -1) +
+  scale_fill_gradientn(colors = color.enrich, breaks = seq(0, 1, .2)) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  coord_fixed(ratio = .8) +
+  scale_x_discrete(expand = expansion(mult = c(0, 0))) +
+  guides(fill = guide_colorbar(barheight = unit(200, "pt")))
+
+plt.heatmap.normalized.enrich
+
+
+
+
+
+
+# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~# -~
+# Original enrichment before any normalization
+
+d.enrich.atom.summary = d.enrich.atom.selected %>% 
+  group_by(phenotype, infused.tracer, Compound) %>% 
+  summarise(enrich.original.mean = mean(enrich.atom.corrected, na.rm = T ),
+            enrich.original.sd = sd(enrich.atom.corrected, na.rm = T),
+            n.replicate = n_distinct(infusion_mouseID),
+            enrich.original.sem = enrich.original.sd / sqrt(n.replicate)) %>% 
+  mutate(phenotype = factor(phenotype, levels = ordered.phenotype))
+d.enrich.atom.summary
+
+
+# Plot 1: WT
+
+plt.original.labeling.WT <-  d.enrich.atom.summary %>% 
+  filter(phenotype == "WT") %>% 
+  ggplot(aes(x = Compound, y = enrich.original.mean, 
+             fill = phenotype, color = phenotype)) +
+  # bar
+  geom_col(alpha = .6, position = position_dodge(.8), width = .8,
+           color = "black", fill = "snow4") +
+  # point
+  geom_quasirandom(
+    data = d.enrich.atom.selected %>% 
+      # filter(infused.tracer == Compound)  %>% 
+      filter(phenotype == "WT"), 
+    aes(y = enrich.atom.corrected), size = .8, color = "black") +
+  # geom_text(data = d.enrich.atom.selected %>% 
+  #             # filter(infused.tracer == Compound)  %>% 
+  #             filter(phenotype == "WT"), 
+  #           aes(label = infusion_mouseID, y = enrich.atom.corrected)) +
+  
+  # errorbar
+  geom_errorbar(
+    aes(ymin = enrich.original.mean - enrich.original.sd,
+        ymax = enrich.original.mean + enrich.original.sd),
+    linewidth = .5, width = .5, position = position_dodge(.8),
+    color = "black") +
+  
+  facet_wrap(~infused.tracer, ncol = 3, scales = "free") +
+  
+  scale_color_manual(values = color.phenotype) +
+  scale_fill_manual(values = color.phenotype) +
+  scale_y_continuous(expand = expansion(mult = c(0, .05)), 
+                     n.breaks = 5) +
+  labs(title = "Original labeling", 
+       y = "Labeling enrichment in serum\n", 
+       x = "Labeled metabolite") +
+  theme.myClassic + 
+  theme(axis.text.x = element_text(angle = 50, hjust = 1, vjust = 1, size = 10),
+        panel.spacing = unit(1, "lines"),
+        legend.position = "none") 
+
+plt.original.labeling.WT
+
+ggsave(filename = "original labeling WT.pdf", 
+       plot = plt.original.labeling.WT, 
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       device = "pdf", height = 12, width = 10)
+
+
+
+# Plot 2: WT vs. HFD vs. ob/ob
+
+plt.original.labeling.3phenotype <- d.enrich.atom.summary %>% 
+  filter(phenotype != "db/db") %>% 
+  ggplot(aes(x = Compound, y = enrich.original.mean, fill = phenotype, color = phenotype)) +
+  geom_col(alpha = .8, position = position_dodge(.8),
+           width = .8, color = "black", linewidth = .3) +
+  
+  geom_errorbar(aes(ymin = enrich.original.mean - enrich.original.sd,
+                    ymax = enrich.original.mean + enrich.original.sd),
+                linewidth = .5, width = .5, position = position_dodge(.8),
+                color = "black") +
+  
+  geom_quasirandom(
+    data = d.enrich.atom.selected %>% filter(phenotype != "db/db") %>% 
+      mutate(phenotype = factor(phenotype, levels = ordered.phenotype)), 
+    aes(y = enrich.atom.corrected), 
+    shape = 21, size = .7, alpha = .6, dodge.width = .8, color = "black",
+    show.legend = F) +
+  
+  facet_wrap(~infused.tracer, ncol = 2, scales = "free") +
+  
+  scale_color_manual(values = color.phenotype, labels = function(x){str_replace(x, "WT", "chow")}) +
+  scale_fill_manual (values = color.phenotype, labels = function(x){str_replace(x, "WT", "chow")}) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1)), 
+                     n.breaks = 5) +
+  theme.myClassic + 
+  theme(axis.text.x = element_text(angle = 50, hjust = 1, vjust = 1, size = 10),
+        panel.spacing = unit(1, "lines"),
+        legend.position = "bottom")  +
+  labs(title = "Original labeling", 
+       y = "Labeling enrichment in serum\n", 
+       x = "Labeled metabolite")
+
+plt.original.labeling.3phenotype
+
+ggsave(filename = "original labeling 3 phenotypes.pdf", 
+       plot = plt.original.labeling.3phenotype, 
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       device = "pdf", height = 12, width = 9)
+
+
+
+
+# Heatmap of original labeling
+
+d.enrich.atom.summary = d.enrich.atom.summary %>% 
+  mutate(tracer.pheno = str_c(phenotype, " ", infused.tracer)) %>% 
+  arrange(infused.tracer, phenotype)
+
+# put in current order
+d.enrich.atom.summary$tracer.pheno = 
+  factor(d.enrich.atom.summary$tracer.pheno,
+         levels = d.enrich.atom.summary$tracer.pheno %>% unique() %>% rev(), 
+         ordered = F)
+
+
+color.enrich.original = c(viridis::viridis(20, option = "G"), "white") %>% rev()
+# color.enrich.original  <- brewer.pal(11, "Spectral") %>% rev()
+color.enrich.original <- colorRampPalette(color.enrich.original, bias = 1)(20)
+
+plt.heatmap.original.enrich.WT = d.enrich.atom.summary %>% 
+  filter(phenotype == "WT") %>% 
+  ggplot(aes(x = Compound, y = tracer.pheno, fill = enrich.original.mean)) +
+  geom_tile(color = "white") +
+  theme(axis.text.x = element_text(angle = 50, hjust = 1),
+        axis.text = element_text(size = 12),
+        legend.text = element_text(size = 12)) +
+  coord_fixed(ratio = .9, expand = 0) +
+  scale_fill_gradientn(colors = color.enrich.original, 
+                       breaks = seq(0, .4, .05),
+                       guide = guide_colorbar(barheight = unit(150, "pt"))) +
+  scale_y_discrete(labels = function(x){str_remove(x, pattern = "WT ")})
+
+plt.heatmap.original.enrich.WT
+
+
+ggsave(filename = "heatmap interlabeling WT.pdf", 
+       plot = plt.heatmap.original.enrich.WT, 
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       device = "pdf", height = 4*1.2, width = 4*1.3)
+
+
+
+save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/5_core_labeling_analysis.RData")
+
+
+
+# check number of replicates
+r <- d.enrich.atom.selected %>% filter(phenotype != "db/db") %>% 
+  group_by(phenotype, infused.tracer, Compound) %>% 
+  summarise(n = n()) %>% 
+  spread(infused.tracer, n)
+r

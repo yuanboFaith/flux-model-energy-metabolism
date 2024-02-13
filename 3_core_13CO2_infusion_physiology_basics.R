@@ -160,7 +160,7 @@ plt.kinetics.infusion.expCurve.modeled_3phenotypes
 ggsave(filename = "13CO2 recovery_infusion_3phenotypes.pdf", 
        plot = plt.kinetics.infusion.expCurve.modeled_3phenotypes, 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       device = "pdf", height = 6, width = 10)
+       height = 6, width = 10)
 
 # only WT
 plt.kinetics.infusion.expCurve.modeled_WT <- 
@@ -914,12 +914,19 @@ d.infusion.stable.2 <- d.infusion.stable.1 %>%
   # phenotype in order
   mutate(phenotype = factor(phenotype, levels = ordered.phenotype))
 
+# for ID, if NA, assign a random number
+d.infusion.stable.2 <- d.infusion.stable.2 %>% 
+  mutate(mouseID = ifelse(is.na(mouseID), sample(1:1000, 1) %>% as.character(), mouseID))
+
+
 # summarize for each mouse in each experiment
 d.infusion.stable.summary1 <- d.infusion.stable.2 %>% 
   group_by(mouseID, round.cage, round, phenotype) %>% 
+  # group_by(mouseID, phenotype) %>% 
   summarise(CO2.umol.min = mean(P_total.umol.min),
             O2.umol.min = mean(O2.consume.umol.min),
-            RER = CO2.umol.min / O2.umol.min) %>% 
+            RER = CO2.umol.min / O2.umol.min,
+            BW = mean(BW)) %>% 
   
   # remove obvious 1-3 outliers in each phenotype that has RER > 1.5
   filter(RER < 1.5) %>% 
@@ -930,11 +937,11 @@ d.infusion.stable.summary1 <- d.infusion.stable.2 %>%
   # remove 1 outliers in HFD with very high O2 consumption
   filter(! (phenotype == "HFD" & O2.umol.min > 125)) 
 
-# summarize 
-d.infusion.stable.summary1 %>% ungroup() %>% 
-  select(-c(mouseID, round.cage, round)) %>% 
-  group_by(phenotype) %>% 
-  summarise(CO2 = mean(CO2.umol.min))
+# # summarize 
+# d.infusion.stable.summary1 %>% ungroup() %>% 
+#   select(-c(mouseID, round.cage, round)) %>% 
+#   group_by(phenotype) %>% 
+#   summarise(CO2 = mean(CO2.umol.min))
 
 
 # significant analysis
@@ -1001,10 +1008,10 @@ plt.RER <- func.plt.basicsPhysiology(whichY = "RER") +
   coord_cartesian(ylim = c(0.7, NA)) 
 
 plt.RER <- (plt.RER + 
-  geom_segment(data = s <- d.infusion.stable.summary1 %>% ungroup() %>% 
-                 pairwise_t_test(RER ~ phenotype, p.adjust.method = "bonferroni") %>% 
-                 func.sig1(y.max.up = .02, y.min.down = .00),
-               aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F)) %>% 
+              geom_segment(data = s <- d.infusion.stable.summary1 %>% ungroup() %>% 
+                             pairwise_t_test(RER ~ phenotype, p.adjust.method = "bonferroni") %>% 
+                             func.sig1(y.max.up = .02, y.min.down = .00),
+                           aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F)) %>% 
   func.sig2()
 plt.RER
 
@@ -1019,10 +1026,10 @@ plt.CO2 <- func.plt.basicsPhysiology(whichY = "CO2.umol.min", mytitle = "CO2 pro
                         breaks = seq(0, 150, 30),
                         name = "mL / h")) 
 plt.CO2 <- (plt.CO2 + 
-  geom_segment(data = s <- d.infusion.stable.summary1 %>% ungroup() %>% 
-                 pairwise_t_test(CO2.umol.min ~ phenotype, p.adjust.method = "bonferroni") %>% 
-                 func.sig1(y.max.up = 5, y.min.down = 5),
-               aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
+              geom_segment(data = s <- d.infusion.stable.summary1 %>% ungroup() %>% 
+                             pairwise_t_test(CO2.umol.min ~ phenotype, p.adjust.method = "bonferroni") %>% 
+                             func.sig1(y.max.up = 5, y.min.down = 5),
+                           aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
   func.sig2()
 plt.CO2
 
@@ -1036,12 +1043,16 @@ plt.O2 <- func.plt.basicsPhysiology(whichY = "O2.umol.min", mytitle = "O2 consum
                         breaks = seq(0, 180, 30),
                         name = "mL / h"))
 plt.O2 <- (plt.O2 +
-  geom_segment(data = s <- d.infusion.stable.summary1 %>% ungroup() %>% 
-                 pairwise_t_test(O2.umol.min ~ phenotype, p.adjust.method = "bonferroni") %>% 
-                 func.sig1(y.max.up = 7, y.min.down = 7),
-               aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
+             geom_segment(data = s <- d.infusion.stable.summary1 %>% ungroup() %>% 
+                            pairwise_t_test(O2.umol.min ~ phenotype, p.adjust.method = "bonferroni") %>% 
+                            func.sig1(y.max.up = 7, y.min.down = 7),
+                          aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
   func.sig2()
 plt.O2
+
+
+# func.plt.basicsPhysiology(whichY = "BW", mytitle = "BW")
+
 
 # load basic animal information from the ordinary infusion experiments
 p <- c("db/db", "WT", "HFD", "ob/ob")
@@ -1052,33 +1063,47 @@ d.animal  <-  read_excel(path = mypath, sheet = "infusion rounds", skip = 7) %>%
   mutate(phenotype = str_extract(mouse_ID, "[a-zA-Z]+")) %>% 
   mutate(phenotype = p[phenotype] %>% factor(levels = p) ) 
 
-# plot body weight
+# plot body weight using the serum-labeling experiment infusion 
 d.BW2 <- d.animal %>% select(phenotype, mouse_ID, BW) %>% 
   group_by(mouse_ID, phenotype) %>% 
   summarise(BW = mean(BW)) %>% 
   filter(phenotype != "db/db") 
 
 plt.BW <- func.plt.basicsPhysiology(
-  mydata = d.BW2, 
+  mydata = d.BW2 %>% group_by(mouse_ID, phenotype) %>% summarise(BW = mean(BW)), 
   whichY = "BW", mytitle = "body weight") +
   scale_y_continuous(breaks = seq(0, 80, 15),limits = c(0, NA),
                      name = "gram",
                      expand = expansion(mult = c(0, .1)))
 plt.BW <- (plt.BW +
-  geom_segment(data = s <- d.BW2 %>% ungroup() %>% 
-                 pairwise_t_test(BW ~ phenotype, p.adjust.method = "bonferroni") %>% 
-                 add_xy_position(x = "phenotype") %>% 
-                 func.sig1(y.max.up = 4, y.min.down = 4, xmin.max.shift = -1),
-               aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
+             geom_segment(data = s <- d.BW2 %>% ungroup() %>% 
+                            pairwise_t_test(BW ~ phenotype, p.adjust.method = "bonferroni") %>% 
+                            add_xy_position(x = "phenotype") %>% 
+                            func.sig1(y.max.up = 4, y.min.down = 4, xmin.max.shift = -1),
+                          aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
   func.sig2()
 plt.BW
+
 
 
 # Glycemia (from the 13CO2 measurement experiments)
 d.glycemia <- d.mouseID %>% 
   filter(phenotype %in% c("WT", "ob/ob", "HFD")) %>% 
   mutate(phenotype = factor(phenotype, levels = c("WT", "HFD", "ob/ob", "db/db"))) %>% 
-  mutate(glycemia = as.numeric(`glycemia.mg/dL-basal`))
+  mutate(glycemia = as.numeric(`glycemia.mg/dL-basal`)) 
+
+x <- d.glycemia %>% filter(phenotype == "ob/ob") %>% group_by(round) %>% 
+  summarise(glycemia = mean(glycemia, na.rm = T), phenotype = "ob/ob")
+
+d.glycemia <- d.glycemia %>% filter(phenotype != "ob/ob") %>% bind_rows(x) %>% 
+  mutate(phenotype = factor(phenotype, levels = ordered.phenotype))
+
+# Glycemia [from the ordinary infusion (serum labeling)  experiments]
+# d.glycemia <- d.animal %>% select(phenotype, mouse_ID, tail_blood_glucose_1) %>% 
+#   group_by(mouse_ID, phenotype) %>% 
+#   summarise(glycemia = mean(tail_blood_glucose_1, na.rm = T)) %>% 
+#   filter(phenotype != "db/db") 
+# d.glycemia <- d.glycemia[complete.cases(d.glycemia), ] %>% filter(between(glycemia, 100, 300))
 
 plt.glycemia <- d.glycemia %>% 
   func.plt.basicsPhysiology(whichY = "glycemia") +
@@ -1088,11 +1113,11 @@ plt.glycemia <- d.glycemia %>%
     sec.axis = sec_axis(trans = ~ . / 180 * 10, name = "mM"))
 
 plt.glycemia <- (plt.glycemia +
-  geom_segment(data = s <- d.glycemia %>% ungroup() %>% 
-                 pairwise_t_test(glycemia ~ phenotype, p.adjust.method = "bonferroni") %>% 
-                 add_xy_position(x = "phenotype") %>% 
-                 func.sig1(),
-               aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
+                   geom_segment(data = s <- d.glycemia %>% ungroup() %>%
+                                  pairwise_t_test(glycemia ~ phenotype, p.adjust.method = "bonferroni") %>% 
+                                  add_xy_position(x = "phenotype") %>% 
+                                  func.sig1(),
+                                aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
   func.sig2()
 plt.glycemia
 
@@ -1115,10 +1140,10 @@ plt.calorie <- d.energyExpenditure %>%
     sec.axis = sec_axis(trans = ~. * 60 / 1000,
                         name = "kcal / h"))
 plt.calorie <- (plt.calorie +
-  geom_segment(data = s <- d.energyExpenditure %>% ungroup() %>% 
-                 pairwise_t_test(cal.min ~ phenotype, p.adjust.method = "bonferroni") %>% 
-                 func.sig1(y.max.up = 1, y.min.down = 1),
-               aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
+                  geom_segment(data = s <- d.energyExpenditure %>% ungroup() %>% 
+                                 pairwise_t_test(cal.min ~ phenotype, p.adjust.method = "bonferroni") %>% 
+                                 func.sig1(y.max.up = 1, y.min.down = 1),
+                               aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
   func.sig2()
 plt.calorie
 
@@ -1136,6 +1161,30 @@ ggsave(filename = "basic physiology.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 8, width = 14)
 
+
+
+# ANCOVA analysis
+d.energyExpenditure.selected <- d.energyExpenditure %>% ungroup() %>% 
+  select(phenotype, mouseID, CO2.L.min, O2.L.min, cal.min, BW, RER) 
+  
+
+# plot
+d.energyExpenditure.selected %>%
+  ggplot(aes(BW, CO2.L.min, color = phenotype)) + 
+  geom_point(size = 3, alpha = .5) +
+  geom_smooth(method = "lm", se = F) +
+  theme.myClassic +
+  scale_color_manual(values = color.phenotype)
+
+ggsave(filename = "BW_energy_expenditure_ANCOVA.pdf", 
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 4, width = 5)
+
+# ANCOVA test
+model.glm <- glm(CO2.L.min ~ BW + phenotype, 
+                 data = d.energyExpenditure.selected, 
+                 family = gaussian(link = "identity"))
+summary(model.glm)
 
 
 # summarize infusion parameters - <>-- <>-- <>-- <>-- <>-- <>-- <>-- <>-- <>-- <>-

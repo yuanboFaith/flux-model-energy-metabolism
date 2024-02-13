@@ -355,7 +355,6 @@ display: none;
 <h1>
 Flux Modeling of Mammalian Energy Metabolism
 </h1>
-<hr />
 <p>This repository contains <em>all</em> source code and raw data to
 reproduce figures and computation in the paper <strong>An Organism-Level
 Quantitative Flux Model of Mammalian Energy Metabolism</strong>. 🌟</p>
@@ -387,8 +386,8 @@ labeling.xlsm</strong>, and the experimental parameters are in
 <ul>
 <li><p><strong>4_core_serum_labeling_import data.R:</strong> imports and
 cleanup all 13C-serum labeling data, and performs natural abundance
-correction. This is mostly done using a homemade mini-package
-<strong>vivoFlux</strong> (mostly a wrapper of Xiaoyang’s <strong><a href="https://github.com/XiaoyangSu/AccuCor">Accucor</a></strong>)</p></li>
+correction. It employs a homemade mini-package <strong>vivoFlux</strong>
+(leveraging Xiaoyang’s <strong><a href="https://github.com/XiaoyangSu/AccuCor">Accucor</a></strong>)</p></li>
 <li><p><strong>5_core_labeling_analysis.R:</strong> analyzes serum
 labeling data, calculate arterial-venous labeling difference, and
 computes circulatory turnover fluxes.</p></li>
@@ -408,6 +407,17 @@ maps flux values (significantly different between phenotypes) to color
 scale; and <strong>12</strong> creates <em>interactive</em>
 networks.</p></li>
 </ul>
+<hr />
+<p><strong>All scripts have been checked to run smoothly. In case of
+error:</strong></p>
+<ul>
+<li>Check path of file import</li>
+<li>Check if you have generated the needed .RData file</li>
+<li>Restart R session to clear package conflict</li>
+<li>Check you have the needed package</li>
+<li>Did you change the raw data? This may cause disruption.</li>
+</ul>
+<p><br></p>
 </div>
 
 

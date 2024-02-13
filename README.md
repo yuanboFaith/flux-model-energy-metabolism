@@ -17,7 +17,7 @@ The raw data from the metabolic cage-isotope analyzer is in folder **data-13CO2*
 
 The serum labeling raw data is in **data_serum labeling.xlsm**, and the experimental parameters are in **data_serum labeling mouse ID.xlsx**.
 
-- **4_core_serum_labeling_import data.R:** imports and cleanup all 13C-serum labeling data, and performs natural abundance correction. This is mostly done using a homemade mini-package **vivoFlux** (mostly a wrapper of Xiaoyang's **[Accucor](https://github.com/XiaoyangSu/AccuCor)**)
+- **4_core_serum_labeling_import data.R:** imports and cleanup all 13C-serum labeling data, and performs natural abundance correction. It employs a homemade mini-package **vivoFlux** (leveraging Xiaoyang's **[Accucor](https://github.com/XiaoyangSu/AccuCor)**)
 
 - **5_core_labeling_analysis.R:** analyzes serum labeling data, calculate arterial-venous labeling difference, and computes circulatory turnover fluxes.
 - **6_core_consumption_flux.R:** calculates the consumption (sink) fluxes, including the oxidation and storing fluxes, and the *direct* fluxes. 
@@ -26,6 +26,15 @@ The serum labeling raw data is in **data_serum labeling.xlsm**, and the experime
 - **9_core_ATP_estimate.R:** calculates the ATP wasted by the futile cycles. 
 - **10_core_draw flux network.R:** draws the metabolic flux network for all three phenotypes. The variant **11** maps flux values (significantly different between phenotypes) to color scale; and **12** creates *interactive* networks. 
 
+---
+
+**All scripts have been checked to run smoothly. In case of error:**
+
+- Check path of file import
+- Check if you have generated the needed .RData file
+- Restart R session to clear package conflict
+- Check you have the needed package
+- Did you change the raw data? This may cause disruption. 
 
 
-
+<br>

@@ -668,8 +668,6 @@ d.Fcirc.standard.atom_art.or.tail = d.Fcirc.standard.atom_art.or.tail %>%  # plo
 
 func.plt.Fcirc.Compound = function(yAxis = "Fcirc_animal") {
   d.Fcirc.standard.atom_art.or.tail %>% 
-    # filter(infused.tracer == "C18:2") %>% 
-    # filter(infused.tracer == "Glutamine") %>% 
     mutate(phenotype = factor(phenotype, levels = ordered.phenotype, ordered = F)) %>% 
     filter(phenotype %in% c("WT", "ob/ob", "HFD")) %>% 
     ggplot(aes_string(x = "phenotype", y = yAxis, color = "phenotype", fill = "phenotype")) +
@@ -713,7 +711,6 @@ plt.Fcirc_animal = func.plt.Fcirc.Compound(yAxis = "Fcirc_animal") +
 plt.Fcirc_animal
 
 ggsave(filename = "molecule Fcirc.pdf",
-       device = "pdf",
        plot = plt.Fcirc_animal + theme(legend.position = "bottom"),
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 5.5, width = 9)
@@ -1110,9 +1107,6 @@ ggsave(filename = "heatmap interlabeling WT.pdf",
 
 
 
-save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/5_core_labeling_analysis.RData")
-
-
 
 # check number of replicates
 r <- d.enrich.atom.selected %>% filter(phenotype != "db/db") %>% 
@@ -1121,3 +1115,248 @@ r <- d.enrich.atom.selected %>% filter(phenotype != "db/db") %>%
   spread(infused.tracer, n)
 r
 
+
+# - Generalized linear regression analysis
+d.Fcirc.BW <- d.Fcirc.standard.atom_art.or.tail %>% 
+  select(Compound, phenotype, infusion_mouseID, BW, Fcirc_animal) %>% 
+  filter(phenotype != "db/db") %>% 
+  # arrange phenotype in order (WT as reference)
+  mutate(phenotype = factor(phenotype, levels = ordered.phenotype)) %>% 
+  arrange(phenotype) %>% 
+  mutate(Compound = factor(Compound, levels = ordered.Compound))
+
+plt.Fcirc.BW <- d.Fcirc.BW %>% 
+  ggplot(aes(x = BW, y = Fcirc_animal, color = phenotype)) +
+  geom_point(size = 3, stroke = 1, alpha = .4) +
+  facet_wrap(~Compound, scales = "free", nrow = 2) +
+  geom_smooth(method = "lm", se = F, show.legend = F) +
+  scale_color_manual(values = color.phenotype) +
+  # convert nmol to µmol / min / animal
+  scale_y_continuous(labels = function(x){x/1000}) +
+  labs(y = "µmol molecules / min") +
+  theme(legend.position = "bottom",
+        panel.spacing = unit(7, units = "pt"),
+        axis.text = element_text(size = 16),
+        strip.text = element_text(size = 15)) 
+plt.Fcirc.BW
+
+# Generalized linear model, with interaction term of BW and phenotype
+# none of the interaction terms are significant
+model.glm <- glm(formula = Fcirc_animal ~ BW + phenotype + BW:phenotype, 
+                 family = gaussian(link = "identity"),
+                 data = d.Fcirc.BW %>% filter(Compound == "Valine"))
+model.glm %>% summary()
+
+
+# traditional ANCOVA without interaction term
+model.glm <- glm(formula = Fcirc_animal ~ BW + phenotype, 
+                 family = gaussian(link = "identity"),
+                 data = d.Fcirc.BW %>% filter(Compound == "Glutamine"))
+summary(model.glm)
+
+# perform all GLM
+d.models <- d.Fcirc.BW %>% 
+  # group_by(Compound) %>% 
+  nest(-Compound) %>% 
+  mutate(
+    # ANCOVA, including BW
+    ANCOVA = map(data, ~glm(formula = Fcirc_animal ~ BW + phenotype, 
+                            family = gaussian(link = "identity"), data = .)),
+    # anova, without BW
+    anova = map(data, ~glm(formula = Fcirc_animal ~ phenotype, 
+                           family = gaussian(link = "identity"), data = .))) %>% 
+  mutate(tidied.ANCOVA = map(ANCOVA, tidy),
+         tidied.anova = map(anova, tidy))
+
+# ANCOVA unnested
+d.ANCOVA <- d.models %>% unnest(tidied.ANCOVA) %>% 
+  rename(p.ANCOVA = p.value) %>% 
+  select(Compound, term, p.ANCOVA) 
+
+# anova unnested
+d.anova <- d.models %>% unnest(tidied.anova) %>% 
+  rename(p.anova = p.value) %>% 
+  select(Compound, term, p.anova) 
+
+# combine the unnested dataset (note the terms are more in GLM, due to additional BW term)
+BW.signif.compounds <- (d.ANCOVA %>% filter(term == "BW") %>% filter(p.ANCOVA < 0.05))$Compound
+
+d.GLM <- d.ANCOVA %>% left_join(d.anova) %>% 
+  mutate(p = ifelse(Compound %in% BW.signif.compounds, p.ANCOVA, p.anova)) %>% 
+  filter(term != "(Intercept)")
+
+# add stars
+func.addStars <- function(x) {
+  sapply(x, function(value) {
+    if (is.na(value)) return("") else
+      if (value <= 0.0001) return("****") else
+        if (value <= 0.001) return("***") else
+          if (value <= 0.01) return("**") else
+            if (value <= 0.05) return("*") else
+              return("")
+  })
+}
+
+# add stars, prepare for visualization
+d.GLM <- d.GLM %>% mutate(stars = func.addStars(p)) %>% 
+  mutate(Compound = factor(Compound, levels = rev(ordered.Compound))) %>% 
+  mutate(term = str_remove(term, "phenotype"))
+
+
+plt.Fcirc.BW.pvalues <- d.GLM %>% 
+  ggplot(aes(x = term, y = Compound, fill = stars)) +
+  geom_tile(color = "snow4") +
+  scale_fill_manual(values = c("grey100", "grey80", "grey40", "grey20")) +
+  labs (y = NULL) +
+  coord_cartesian(expand = 0) +
+  theme(legend.position = "bottom",
+        axis.text = element_text(size = 15))
+plt.Fcirc.BW.pvalues
+
+plot_grid(plt.Fcirc.BW ,
+          ggplot() + theme_void(),
+          plt.Fcirc.BW.pvalues, nrow = 1, 
+          rel_widths = c(3.9, .1, 1))
+
+ggsave(filename = "Fcirc_BW.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 6, width = 14)
+
+
+
+# -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<># -<>
+# Check nutrients level in serum
+
+# analysis of Fcirc with TIC 
+# define function to normalize a vector to [0, 1]
+func.norm = function(x){
+  x / max(x)
+}
+
+d.corrected.tidy2 <- d.corrected.tidy %>% 
+  filter(! sample %in% c("bt-tail-O101")) %>%  # peculiar 3HB outlier that is 2-times high than the 2nd largest value
+  filter(phenotype != "db/db") %>% 
+  filter(C_Label == 0 & blood == "tail") %>% 
+  # phenotype and compunds in order
+  mutate(phenotype = factor(phenotype, levels = ordered.phenotype),
+         Compound = factor(Compound, levels = ordered.Compound))
+
+# glycerol measured as derivatized G3P
+d.glycerol <- d.corrected.tidy2 %>% 
+  filter(Compound == "Glycerol" & str_detect(MS.run,or( "10_G3P_ar_bd", "7_G3P_a-n_q-z-aa-ae", "9_G3P_HILIC_am-ao")))
+# other nutrients
+d.otherNutrients <- d.corrected.tidy2 %>% 
+  filter(Compound != "Glycerol" & (!str_detect(MS.run, "G3P"))) %>% 
+  filter(MS.run %in% c("11_ar_bd_EarlyElution", "12_ar_bd_LateElution", "18_bt-bw", "20_ce", "21_cf"))
+  
+
+                         
+# d.corrected.tidy2 %>%
+#   filter(Compound == "Glucose") %>%
+#   ggplot(aes(x = phenotype, y = intensity, color = phenotype)) +
+#   geom_quasirandom(width = .1, alpha = .4) +
+#   facet_wrap(~MS.run, nrow = 2, scales = "free") +
+#   theme(legend.position = "none") +
+#   expand_limits(y = 0)
+
+
+# combine glycerol and other nutrients
+d.intensity.norm.eachMouse <- d.glycerol %>% bind_rows(d.otherNutrients)  %>% 
+  # normalize based on each separate MS run
+  group_by(MS.run, Compound) %>%
+  mutate(intens.norm = func.norm(intensity)) %>%
+  # take the average for individual mouse
+  group_by(phenotype, mouse_ID, Compound) %>%
+  summarise(intens.norm.mean = mean(intens.norm))
+
+d.intensity.norm.eachMouse %>% filter(Compound == "3-HB") %>% arrange(desc(intens.norm.mean))
+
+# plot
+plt.serum.metabolites <-  d.intensity.norm.eachMouse %>% 
+  ggplot(aes(x = phenotype, y = intens.norm.mean, fill = phenotype)) + 
+  stat_summary(fun = mean, geom = "bar", color = "black", alpha = .5) +
+  stat_summary(fun.data = mean_sdl, geom = "errorbar",
+               fun.args = list(mult = 1), 
+               width = .3, color = "black") +
+  geom_quasirandom(width = .3, alpha = .5) +
+  # stat_summary(fun = mean, geom = "crossbar", width = .5, color = "black") +
+  facet_wrap(~Compound, nrow = 2, scales = "free_x") +
+  expand_limits(y = 0) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1)), breaks = seq(0, 1.2, .2)) +
+  scale_x_discrete(expand = expansion(add = .8)) +
+  labs(x = NULL, y = "relative abundance\n") +
+  theme.myClassic +
+  theme(panel.spacing = unit(20, "pt"), 
+        legend.position = "none",
+        axis.text = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.text = element_text(size = 16)) +
+  scale_fill_manual(values = color.phenotype)
+plt.serum.metabolites
+
+# perform significant analysis on serum metabolites
+library(rstatix)
+d.intensity.norm.eachMouse
+
+d.intensity.signif <- d.intensity.norm.eachMouse %>% 
+  group_by(Compound) %>% 
+  pairwise_t_test(intens.norm.mean ~ phenotype, p.adjust.method = "bonferroni") %>% 
+  add_xy_position(x = "phenotype") %>% 
+  filter(p < 0.05)
+
+plt.serum.metabolites +
+  # crossbar
+  geom_segment(
+    data = d.intensity.signif,
+    aes(x = xmin, xend = xmax, y = y.position, yend = y.position), 
+    inherit.aes = F) +
+  # stars
+  geom_text(
+    data = d.intensity.signif, size = 6,
+    aes(x = (xmin +  xmax)/2, y = y.position + 0.02, label = p.signif), 
+    inherit.aes = F)
+
+ggsave(filename = "serum metabolomics.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 6, width = 10)
+
+
+ # Check concentration relationship with Fcirc
+# use concentration in that specific infusion experiment, instead of using pooled data
+d.intensity.normalized <- d.corrected.tidy %>%
+  filter(C_Label == 0, blood == "tail") %>%
+  select(MS.run, infused.tracer, Compound, phenotype, mouse_ID, infusion_round, intensity) %>%
+  group_by(MS.run, infused.tracer, Compound) %>%
+  mutate(intens.normalized = func.norm(intensity)) %>%
+  mutate(infusion_mouseID = paste0(infusion_round, "_", mouse_ID))
+
+# combine Fcirc data with normalized intensity data
+d.intensity.normalized3 <- d.intensity.normalized %>% 
+  filter(Compound == infused.tracer) %>% ungroup() %>% 
+  select(phenotype, infusion_mouseID, Compound, intens.normalized)
+
+d.Fcirc.BW.intensity <- d.Fcirc.BW %>% 
+  left_join(d.intensity.normalized3, by = c("Compound", "infusion_mouseID", "phenotype"))
+
+# !!! NOTE that the normalization is NOT perfect. 
+# e.g., for measurement of lactate, the HFD samples were ran alone, and normalized by itself, without WT and ob/ob
+# and thus cann't compare their concentration directly
+d.Fcirc.BW.intensity %>% 
+  ggplot(aes(x = intens.normalized, y = Fcirc_animal, color = phenotype)) + 
+  geom_point(size = 3, alpha = .6) +
+  geom_smooth(method = "lm", se = F) +
+  scale_y_continuous(labels = function(x){x/1000}, name = "µmol / min") +
+  # scale_x_continuous(breaks = seq(0, 1, .2)) +
+  facet_wrap(~Compound, scales = "free", nrow = 2) +
+  scale_color_manual(values = color.phenotype) +
+  theme.mybw +
+  theme(axis.text.x = element_text(angle = 45),
+        legend.position = "bottom")
+
+ggsave(filename = "serum metabolomics_Fcirc.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 6, width = 10)
+
+save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/5_core_labeling_analysis.RData")

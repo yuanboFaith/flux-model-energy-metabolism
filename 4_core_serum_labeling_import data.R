@@ -128,10 +128,15 @@ func.combine_sample_ID = function(dataset.tidy){
   return(d.tidy)
 } 
 
-d.normalized.tidy.1 = func.combine_sample_ID(dataset.tidy = list.corrected$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.1 = func.combine_sample_ID(dataset = list.corrected$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.1 = func.combine_sample_ID(
+  dataset.tidy = list.corrected$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.1 = func.combine_sample_ID(
+  dataset = list.corrected$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  # the intensity will be normalized separately for each separate MS.run 
+  mutate(MS.run = "1_a_h")
 
 
 
@@ -143,10 +148,14 @@ list.corrected.2 = read_excel(path.labeling, sheet = "RU_x-aa") %>%
   flx.subtract_background(blankSamples =  c("Blank1",	"Blank3",	"Blank4")) %>% 
   natural_abundance_correction(resolution = 70000)
 
-d.normalized.tidy.2 = func.combine_sample_ID(dataset.tidy = list.corrected.2$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.2 = func.combine_sample_ID(dataset = list.corrected.2$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.2 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.2$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.2 = func.combine_sample_ID(
+  dataset = list.corrected.2$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "2_RU_x-aa")
 
 
 
@@ -157,10 +166,14 @@ list.corrected.3 = read_excel(path.labeling, sheet = "RU_i-n") %>%
   flx.subtract_background(blankSamples =  paste0("Blank", 3:9)) %>% 
   natural_abundance_correction(resolution = 70000)
 
-d.normalized.tidy.3 = func.combine_sample_ID(dataset.tidy = list.corrected.3$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.3 = func.combine_sample_ID(dataset = list.corrected.3$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.3 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.3$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.3 = func.combine_sample_ID(
+  dataset = list.corrected.3$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "3_RU_i-n")
 
 
 
@@ -182,10 +195,14 @@ list.corrected.4 = d4 %>%
   flx.subtract_background(blankSamples =  paste0("blank", 1:5)) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.4 = func.combine_sample_ID(dataset.tidy = list.corrected.4$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.4 = func.combine_sample_ID(dataset = list.corrected.4$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.4 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.4$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.4 = func.combine_sample_ID(
+  dataset = list.corrected.4$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "4_clamp_af-ah")
 
 
 
@@ -199,10 +216,13 @@ list.corrected.5 = read_excel(path.labeling, sheet = "G3P_o-p") %>%
   flx.subtract_background(blankSamples =  paste0("blank_glycerol3P_", 1:3)) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.5 = func.combine_sample_ID(dataset.tidy = list.corrected.5$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.5 = func.combine_sample_ID(dataset = list.corrected.5$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.5 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.5$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+d.corrected.tidy.5 = func.combine_sample_ID(
+  dataset = list.corrected.5$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "5_G3P_o-p")
 
 # remove artery sample due to contamination from lock solution; so much higher labeling in venous blood than artery blood due to dilution by lock solution-glycerol
 d.normalized.tidy.5 = d.normalized.tidy.5 %>% filter(sample %>% str_detect("tail"))
@@ -216,10 +236,14 @@ list.corrected.6 = read_excel(path.labeling, sheet = "o-p-r-s-t-u-v-w") %>%
   flx.subtract_background(blankSamples =  paste0("blank_", 6:9)) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.6 = func.combine_sample_ID(dataset.tidy = list.corrected.6$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.6 = func.combine_sample_ID(dataset = list.corrected.6$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.6 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.6$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.6 = func.combine_sample_ID(
+  dataset = list.corrected.6$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "6_o-p-r-s-t-u-v-w")
 
 
 
@@ -229,10 +253,14 @@ list.corrected.7 = read_excel(path.labeling, sheet = "G3P_a-n_q-z-aa-ae") %>%
   flx.subtract_background(blankSamples =  c("blank2", "blank4")) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.7 = func.combine_sample_ID(dataset.tidy = list.corrected.7$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.7 = func.combine_sample_ID(dataset = list.corrected.7$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.7 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.7$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.7 = func.combine_sample_ID(
+  dataset = list.corrected.7$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "7_G3P_a-n_q-z-aa-ae")
 
 
 # Sheet 8: gluconeogenic, ab, ac, ad
@@ -240,10 +268,14 @@ list.corrected.8 = read_excel(path.labeling, sheet = "ab_ac_ad") %>%
   flx.subtract_background(blankSamples =  paste0("blank", 1:6) ) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.8 = func.combine_sample_ID(dataset.tidy = list.corrected.8$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.8 = func.combine_sample_ID(dataset = list.corrected.8$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.8 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.8$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.8 = func.combine_sample_ID(
+  dataset = list.corrected.8$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "8_ab_ac_ad")
 
 
 
@@ -252,13 +284,14 @@ list.corrected.9 = read_excel(path.labeling, sheet = "G3P_HILIC_am-ao") %>%
   flx.subtract_background(blankSamples =  paste0("blk", 1:3) ) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.9 = func.combine_sample_ID(dataset.tidy = list.corrected.9$Normalized %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.9 = func.combine_sample_ID(dataset = list.corrected.9$Corrected %>% 
-                                              gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.9 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.9$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
 
-
-
+d.corrected.tidy.9 = func.combine_sample_ID(
+  dataset = list.corrected.9$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "9_G3P_HILIC_am-ao")
 
 
 
@@ -267,31 +300,43 @@ d.corrected.tidy.9 = func.combine_sample_ID(dataset = list.corrected.9$Corrected
 list.corrected.10 = read_excel(path.labeling, sheet = "G3P_ar_bd") %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.10 = func.combine_sample_ID(dataset.tidy = list.corrected.10$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.10 = func.combine_sample_ID(dataset = list.corrected.10$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.10 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.10$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.10 = func.combine_sample_ID(
+  dataset = list.corrected.10$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "10_G3P_ar_bd")
 
 
 # Sheet 11:  # ar to bd, early elution 
 list.corrected.11 = read_excel(path.labeling, sheet = "ar_bd_EarlyElution") %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.11 = func.combine_sample_ID(dataset.tidy = list.corrected.11$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.11 = func.combine_sample_ID(dataset = list.corrected.11$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.11 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.11$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.11 = func.combine_sample_ID(
+  dataset = list.corrected.11$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "11_ar_bd_EarlyElution")
 
 
 
-# Sheet 12:  # ar to bd, early elution 
+# Sheet 12:  # ar to bd, late elution 
 list.corrected.12 = read_excel(path.labeling, sheet = "ar_bd_LateElution") %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.12 = func.combine_sample_ID(dataset.tidy = list.corrected.12$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.12 = func.combine_sample_ID(dataset = list.corrected.12$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.12 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.12$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.12 = func.combine_sample_ID(
+  dataset = list.corrected.12$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "12_ar_bd_LateElution")
 
 
 # Sheet 13:  # be to bf
@@ -299,10 +344,14 @@ list.corrected.13 = read_excel(path.labeling, sheet = "be-bf_valine") %>%
   flx.subtract_background(blankSamples =  c("blk2", "blk4") ) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.13 = func.combine_sample_ID(dataset.tidy = list.corrected.13$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.13 = func.combine_sample_ID(dataset = list.corrected.13$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.13 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.13$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.13 = func.combine_sample_ID(
+  dataset = list.corrected.13$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "13_be-bf_valine")
 
 
 # Sheet 14:  # bg to bk
@@ -310,10 +359,14 @@ list.corrected.14 = read_excel(path.labeling, sheet = "bg-bk") %>%
   flx.subtract_background(blankSamples =  c("blk_3", "blk_4") ) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.14 = func.combine_sample_ID(dataset.tidy = list.corrected.14$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.14 = func.combine_sample_ID(dataset = list.corrected.14$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.14 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.14$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.14 = func.combine_sample_ID(
+  dataset = list.corrected.14$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "14_bg-bk")
 
 # ----------
 # sheet 15: bl - bp: C18:1 and C18:2 
@@ -327,10 +380,14 @@ list.corrected.15 = d15 %>%
   flx.subtract_background(blankSamples =  c("blk_3", "blank_1")) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.15 = func.combine_sample_ID(dataset.tidy = list.corrected.15$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.15 = func.combine_sample_ID(dataset = list.corrected.15$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.15 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.15$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.15 = func.combine_sample_ID(
+  dataset = list.corrected.15$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "15_bl-bp")
 
 
 # sheet 16: bq - bs
@@ -344,10 +401,14 @@ list.corrected.16 = d16 %>%
   flx.subtract_background(blankSamples =  paste0("buffer_", 1:4)) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.16 = func.combine_sample_ID(dataset.tidy = list.corrected.16$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.16 = func.combine_sample_ID(dataset = list.corrected.16$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.16 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.16$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.16 = func.combine_sample_ID(
+  dataset = list.corrected.16$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "16_bq-bs")
 
 
 
@@ -357,10 +418,14 @@ d17 = read_excel(path.labeling, sheet = "G3P_be_bk")
 list.corrected.17 = d17 %>% flx.subtract_background(blankSamples = "Enz-blank") %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.17 = func.combine_sample_ID(dataset.tidy = list.corrected.17$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.17 = func.combine_sample_ID(dataset = list.corrected.17$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.17 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.17$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.17 = func.combine_sample_ID(
+  dataset = list.corrected.17$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "17_G3P_be_bk")
 
 
 
@@ -370,10 +435,14 @@ list.corrected.18 = d18 %>%
   flx.subtract_background(blankSamples = c("blank_3", "blank_4", "blank_5")) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.18 = func.combine_sample_ID(dataset.tidy = list.corrected.18$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.18 = func.combine_sample_ID(dataset = list.corrected.18$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.18 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.18$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.18 = func.combine_sample_ID(
+  dataset = list.corrected.18$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "18_bt-bw")
 
 
 # sheet 19: bz-ca
@@ -382,10 +451,14 @@ list.corrected.19 = d19 %>%
   flx.subtract_background(blankSamples = c("blank_2",	"blank_3",	"blank_4")) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.19 = func.combine_sample_ID(dataset.tidy = list.corrected.19$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.19 = func.combine_sample_ID(dataset = list.corrected.19$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.19 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.19$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.19 = func.combine_sample_ID(
+  dataset = list.corrected.19$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "19_bz-ca")
 
 # sheet 20: ce
 d20 = read_excel(path.labeling, sheet = "ce")
@@ -393,10 +466,14 @@ list.corrected.20 = d20 %>%
   flx.subtract_background(blankSamples = c("blk_2")) %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.20 = func.combine_sample_ID(dataset.tidy = list.corrected.20$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.20 = func.combine_sample_ID(dataset = list.corrected.20$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.20 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.20$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.20 = func.combine_sample_ID(
+  dataset = list.corrected.20$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "20_ce")
 
 
 # sheet 21: cf
@@ -404,10 +481,14 @@ d21 = read_excel(path.labeling, sheet = "cf")
 list.corrected.21 = d21 %>% 
   natural_abundance_correction(resolution = 12000)
 
-d.normalized.tidy.21 = func.combine_sample_ID(dataset.tidy = list.corrected.21$Normalized %>% 
-                                                gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-d.corrected.tidy.21 = func.combine_sample_ID(dataset = list.corrected.21$Corrected %>% 
-                                               gather(-c(Compound, C_Label), key = sample, value = intensity))
+d.normalized.tidy.21 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.21$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.21 = func.combine_sample_ID(
+  dataset = list.corrected.21$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "21_cf")
 
 
 

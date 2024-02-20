@@ -1,7 +1,7 @@
 <h1>Flux Modeling of Mammalian Energy Metabolism</h1>
 
 
-This repository contains *all* source code and raw data to reproduce figures and computation in the paper **An Organism-Level Quantitative Flux Model of Mammalian Energy Metabolism**. 🌟
+This repository contains *all* source code and raw data to reproduce figures and computation in the paper ***An Organism-Level Quantitative Flux Model of Mammalian Energy Metabolism***. 🌟
 
 The source code is prefixed with numbers **1** to **12**. Run each script sequentially by the prefix. Running each file will generate an associated **.RData** file, which will be imported in the following script.
 

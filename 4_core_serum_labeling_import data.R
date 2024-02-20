@@ -105,7 +105,9 @@ d.standardInfusionParameters = read_excel(path.infusion.surgery, sheet = "infusi
 # Labeling data =======
 path.labeling = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/data_serum labeling.xlsm"
 
-d.LCMS_sampleInfo = read_excel(path.labeling, sheet = "sample_info") 
+d.LCMS_sampleInfo = read_excel(path.labeling, sheet = "sample_info") %>% 
+  select(1:5) # not selecting the last two columns on Rutgers code and MS file names
+
 # Check there is no duplicated rows
 if (d.LCMS_sampleInfo %>% duplicated() %>% sum() >0) stop("There is duplicated rows in the mouse_ID dataset.")
 

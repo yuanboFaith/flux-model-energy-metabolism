@@ -334,8 +334,9 @@ func.plt.tail.vs.art = function(data = d.normalized.tidy,
 }
 
 func.plt.tail.vs.art(data = d.normalized.tidy,
-                     myCompound.infused = "3-HB", 
-                     myCompound.labeled = "3-HB", yAxis.input = "enrichment")
+                     myCompound.infused = "Lactate", 
+                     myCompound.labeled = "Lactate", yAxis.input = "enrichment") +
+  expand_limits(y = 0)
 
 # func.plt.tail.vs.art(data = d.normalized.tidy ,
 #                      myCompound.infused = "Glucose", myCompound.labeled = "Glucose", yAxis.input = "enrichment")

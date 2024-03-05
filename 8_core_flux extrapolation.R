@@ -118,6 +118,8 @@ ggsave(filename = "amino acid distribution.pdf",
        height = 4.5, width = 3)
 
 
+
+
 # ATOM-based correction factor
 favorite <- s.all.carbon.pct.summary %>%
   filter(protein != "collagen" & base == "pct_C.atom" & whichAA == "Valine")

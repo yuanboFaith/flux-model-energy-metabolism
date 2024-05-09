@@ -26,7 +26,6 @@ The serum labeling raw data is in **data_serum labeling.xlsm**, and the experime
 - **9_core_ATP_estimate.R:** calculates the ATP wasted by the futile cycles. 
 - **10_core_draw flux network.R:** draws the metabolic flux network for all three phenotypes. The variant **11** maps flux values (significantly different between phenotypes) to color scale; and **12** creates *interactive* networks. 
 
----
 
 **All scripts have been checked to run smoothly. In case of error:**
 
@@ -36,5 +35,13 @@ The serum labeling raw data is in **data_serum labeling.xlsm**, and the experime
 - Check you have the needed package
 - Did you change the raw data? This may cause disruption. 
 
-
 <br>
+
+----
+
+**Reference of R code for data wrangling and data visualization:**
+
+- [DataBrewer.co](https://databrewer.co/) 
+- [R for Data Science (2e)](https://r4ds.hadley.nz/)
+
+

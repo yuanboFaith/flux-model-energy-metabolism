@@ -939,8 +939,9 @@ d.production.consumption.mirror <-
   d.production.consumption %>% 
   mutate(nmol.min.animal.mean = ifelse(str_detect(x.axis, "consumption"), 
                                        -nmol.min.animal.mean, nmol.min.animal.mean),
-         err.Y = ifelse(str_detect(x.axis, "consumption"), 
-                        -err.Y, err.Y)) %>% 
+         err.Y.animal = ifelse(str_detect(x.axis, "consumption"), 
+                               -err.Y, err.Y)) %>% 
+  select(-err.Y) %>% # later need to specify the error to basis of animal, gBW, gFat, or gLean
   mutate(x.axis = str_remove(x.axis, or( "_production", "_consumption")),
          x.axis = factor(x.axis, levels = ordered.phenotype))
 
@@ -954,59 +955,337 @@ d.edge <- d.production.consumption.mirror %>%
   summarise(edge = max(edge))
 
 
-# visualization
-plt.production.consumption.mirror <-  
-  d.production.consumption.mirror %>% 
-  ggplot(aes(x = x.axis, y = nmol.min.animal.mean, fill = myfill)) +
-  geom_col(color = "black") +
-  facet_wrap(~ about, scales = "free_y", nrow = 2) +
-  geom_errorbar(aes(ymax = err.Y,
-                    ymin = ifelse(nmol.min.animal.mean > 0, 
-                                  err.Y - nmol.min.animal.SEM,
-                                  err.Y + nmol.min.animal.SEM)),
-                width = .4) +
-  geom_hline(yintercept = 0, linewidth = 1) +
-  scale_fill_manual(
-    values = color.Compounds, 
-    name = "source of production, \nor destiny of consumption",
-    labels = c("non-Ox sink" = "Storage (recycle)",
-               "storage" = "Storage (release)")) +
-  theme_minimal(base_size = 14) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        strip.background = element_blank(),
-        strip.text = element_text(face = "bold", size = 14),
-        axis.text = element_text(color = "black", size = 13),
-        axis.ticks = element_line(color = "snow4"),
-        panel.spacing = unit(20, "pt"),
-        panel.grid = element_blank(),
-        # panel.grid.minor.y = element_line(linetype = "dashed", linewidth = .1),
-        # panel.grid.major.y = element_line(linetype = "dotted", linewidth = .1),
-        legend.title = element_text(size = 10))  +
-  scale_x_discrete(
-    expand = expansion(add = 1), 
-    labels = function(x){str_replace(x, "WT", "control")},
-    name = NULL) +
-  scale_y_continuous(labels = function(x){abs(x)/1000},
-                     name = "µmol C / min / animal\n",
-                     n.breaks = 7,
-                     expand = expansion(mult = c(0.05, 0.05))) +
+# # visualization 
+# # Per animal 
+# plt.production.consumption.mirror <-  
+#   d.production.consumption.mirror %>% 
+#   ggplot(aes(x = x.axis, y = nmol.min.animal.mean, fill = myfill)) +
+#   geom_col(color = "black") +
+#   facet_wrap(~ about, scales = "free_y", nrow = 2) +
+#   geom_errorbar(aes(ymax = err.Y.animal,
+#                     ymin = ifelse(nmol.min.animal.mean > 0, 
+#                                   err.Y.animal - nmol.min.animal.SEM,
+#                                   err.Y.animal + nmol.min.animal.SEM)),
+#                 width = .4) +
+#   geom_hline(yintercept = 0, linewidth = 1) +
+#   scale_fill_manual(
+#     values = color.Compounds, 
+#     name = "source of production, \nor destiny of consumption",
+#     labels = c("non-Ox sink" = "Storage (recycle)",
+#                "storage" = "Storage (release)")) +
+#   theme_minimal(base_size = 14) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         strip.background = element_blank(),
+#         strip.text = element_text(face = "bold", size = 14),
+#         axis.text = element_text(color = "black", size = 13),
+#         axis.ticks = element_line(color = "snow4"),
+#         panel.spacing = unit(20, "pt"),
+#         panel.grid = element_blank(),
+#         # panel.grid.minor.y = element_line(linetype = "dashed", linewidth = .1),
+#         # panel.grid.major.y = element_line(linetype = "dotted", linewidth = .1),
+#         legend.title = element_text(size = 10))  +
+#   scale_x_discrete(
+#     expand = expansion(add = 1), 
+#     labels = function(x){str_replace(x, "WT", "control")},
+#     name = NULL) +
+#   scale_y_continuous(labels = function(x){abs(x)/1000},
+#                      name = "µmol C / min / animal\n",
+#                      n.breaks = 7,
+#                      expand = expansion(mult = c(0.05, 0.05))) +
+#   
+#   # as the consumption and production calculated values are not perfectly the same
+#   # panels thus are not perfectly aligned in the center. To fix this:
+#   # add point to mark the boundary of the plots
+#   # so that the y = 0 is all aligned up across panels
+#   geom_point(data = d.edge, 
+#              aes(x = factor("ob/ob"), y = edge * 1.02), 
+#              inherit.aes = F, size = 0, alpha = 0) +
+#   geom_point(data = d.edge, 
+#              aes(x = factor("ob/ob"), y = -edge * 1.02), 
+#              inherit.aes = F, size = 0, alpha = 0) 
+# 
+# plt.production.consumption.mirror
+
+
+
+# normalized based on per body weight
+d.BW2 <- d.BW %>% group_by(phenotype) %>% summarise(BW = mean(BW.mean))
+# composition of fat percent of body weight
+d.composition <- tibble(
+  phenotype = c("WT", "HFD", "ob/ob", "db/db"),
+  fat.frac = c(0.17, 0.47, 0.51, .51))
+# lean and fat mass
+d.BW2 <- d.BW2 %>% left_join(d.composition) %>% 
+  mutate(fat = BW * fat.frac, lean = BW * (1-fat.frac)) %>% 
+  select(-fat.frac)
+
+d.BW2
+
+
+# calculate fluxes based on per g BW, per g fat mass, or per g of lean mass
+d.production.consumption.mirror.normalized <- d.production.consumption.mirror %>%
+  left_join(d.BW2) %>%
+  mutate(
+    # BW
+    nmol.min.gBW = nmol.min.animal.mean / BW,
+    nmol.min.gBW.SEM = nmol.min.animal.SEM / BW,
+    err.Y.gBW = err.Y.animal / BW,
+    
+    # fat
+    nmol.min.gFat = nmol.min.animal.mean / fat,
+    nmol.min.gFat.SEM = nmol.min.animal.SEM / fat,
+    err.Y.gFat = err.Y.animal / fat,
+    
+    # lean
+    nmol.min.gLean = nmol.min.animal.mean / lean,
+    nmol.min.gLean.SEM = nmol.min.animal.SEM / lean,
+    err.Y.gLean = err.Y.animal / lean
+  )
+
+
+func.mirror <- function(
+    y = "nmol.min.gFat",  # y axis
+    err.Y = "err.Y.gFat", # cumulated y-axis position for error bars
+    errorBar = "nmol.min.gFat.SEM", # the SEM for each conversion flux 
+    norm.basis = "g Fat", # the basis of normalization
+    myEdge = 35, # trial-error parameter to align all plots along the center
+    fig.width = 11, fig.height = 7 # dimension for per animal basis; g basis has longer y-axis texts, needed wider width
+){
+  p <- d.production.consumption.mirror.normalized %>% 
+    ggplot(aes(x = x.axis, y = .data[[y]], fill = myfill)) +
+    geom_col(color = "black") +
+    geom_errorbar(aes(ymax = .data[[err.Y]],
+                      ymin = ifelse(.data[[y]] > 0, 
+                                    .data[[err.Y]] - .data[[errorBar]],
+                                    .data[[err.Y]] + .data[[errorBar]])),
+                  width = .4) +
+    geom_hline(yintercept = 0, linewidth = 1) +
+    facet_wrap(~ about, scales = "free_y", nrow = 2) +
+    scale_fill_manual(
+      values = color.Compounds, 
+      name = "source of production, \nor destiny of consumption",
+      labels = c("non-Ox sink" = "Storage (recycle)",
+                 "storage" = "Storage (release)")) +
+    theme_minimal(base_size = 14) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          strip.background = element_blank(),
+          strip.text = element_text(face = "bold", size = 14),
+          axis.text = element_text(color = "black", size = 13),
+          axis.ticks = element_line(color = "snow4"),
+          panel.spacing = unit(20, "pt"),
+          panel.grid = element_blank(),
+          # panel.grid.minor.y = element_line(linetype = "dashed", linewidth = .1),
+          # panel.grid.major.y = element_line(linetype = "dotted", linewidth = .1),
+          legend.title = element_text(size = 10))  +
+    scale_x_discrete(
+      expand = expansion(add = 1), 
+      labels = function(x){str_replace(x, "WT", "control")},
+      name = NULL) +
+    scale_y_continuous(name = paste("nmol C / min /", norm.basis, "\n"),
+                       n.breaks = 7,
+                       expand = expansion(mult = c(0.05, 0.05))) +
+    
+    # as the consumption and production calculated values are not perfectly the same
+    # panels thus are not perfectly aligned in the center. To fix this:
+    # add point to mark the boundary of the plots
+    # so that the y = 0 is all aligned up across panels
+    geom_point(data = d.edge, 
+               aes(x = factor("ob/ob"), y = edge * myEdge/1000), 
+               inherit.aes = F, size = 0, alpha = 0) +
+    geom_point(data = d.edge, 
+               aes(x = factor("ob/ob"), y = -edge * myEdge/1000), 
+               inherit.aes = F, size = 0, alpha = 0) 
   
-  # as the consumption and production calculated values are not perfectly the same
-  # panels thus are not perfectly aligned in the center. To fix this:
-  # add point to mark the boundary of the plots
-  # so that the y = 0 is all aligned up across panels
-  geom_point(data = d.edge, 
-             aes(x = factor("ob/ob"), y = edge * 1.02), 
-             inherit.aes = F, size = 0, alpha = 0) +
-  geom_point(data = d.edge, 
-             aes(x = factor("ob/ob"), y = -edge * 1.02), 
-             inherit.aes = F, size = 0, alpha = 0) 
+  ggsave(filename = paste0("mirror ", norm.basis, ".pdf"), 
+         path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+         height = fig.height, width = fig.width)
+  
+  return(p)
+  
+}
 
-plt.production.consumption.mirror
+# per animal basis
+func.mirror(y = "nmol.min.animal.mean",  # y axis
+            err.Y = "err.Y.animal", # accumulated y-axis position for error bars
+            errorBar = "nmol.min.animal.SEM", # the SEM for each conversion flux 
+            norm.basis = "animal", # the basis of normalization
+            myEdge = 1) +
+  # update y axis: convert nmol to µmol
+  scale_y_continuous(labels = ~ .x / 1000, name = "µmol C / min / animal")
 
-ggsave(filename = "production_consumption.mirror.pdf", 
-       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 7, width = 11)
+ggsave(filename = paste0("mirror ", "animal", ".pdf"), 
+       height = 7, width = 11,
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures")
+
+
+
+# normalize by g BW
+func.mirror( y = "nmol.min.gBW",  # y axis
+             err.Y = "err.Y.gBW", # accumulated y-axis position for error bars
+             errorBar = "nmol.min.gBW.SEM", # the SEM for each conversion flux 
+             norm.basis = "per g body weight", # the basis of normalization
+             myEdge = 15, fig.width = 13)
+
+# normalize by lean mass
+func.mirror( y = "nmol.min.gLean",  # y axis
+             err.Y = "err.Y.gLean", # accumulated y-axis position for error bars
+             errorBar = "nmol.min.gLean.SEM", # the SEM for each conversion flux 
+             norm.basis = "per g lean mass", # the basis of normalization
+             myEdge = 35, fig.width = 13)
+
+# normalize by fat mass
+func.mirror( y = "nmol.min.gFat",  # y axis
+             err.Y = "err.Y.gFat", # accumulated y-axis position for error bars
+             errorBar = "nmol.min.gFat.SEM", # the SEM for each conversion flux 
+             norm.basis = "per g Fat", # the basis of normalization
+             myEdge = 35, fig.width = 13)
+
+
+
+# 
+# # g BW
+# d.production.consumption.mirror.normalized %>% 
+#   ggplot(aes(x = x.axis, y = nmol.min.gBW, fill = myfill)) +
+#   geom_col(color = "black") +
+#   geom_errorbar(aes(ymax = err.Y.gBW,
+#                     ymin = ifelse(nmol.min.gBW > 0, 
+#                                   err.Y.gBW - nmol.min.gBW.SEM,
+#                                   err.Y.gBW + nmol.min.gBW.SEM)),
+#                 width = .4) +
+#   geom_hline(yintercept = 0, linewidth = 1) +
+#   facet_wrap(~ about, scales = "free_y", nrow = 2) +
+#   scale_fill_manual(
+#     values = color.Compounds, 
+#     name = "source of production, \nor destiny of consumption",
+#     labels = c("non-Ox sink" = "Storage (recycle)",
+#                "storage" = "Storage (release)")) +
+#   theme_minimal(base_size = 14) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         strip.background = element_blank(),
+#         strip.text = element_text(face = "bold", size = 14),
+#         axis.text = element_text(color = "black", size = 13),
+#         axis.ticks = element_line(color = "snow4"),
+#         panel.spacing = unit(20, "pt"),
+#         panel.grid = element_blank(),
+#         # panel.grid.minor.y = element_line(linetype = "dashed", linewidth = .1),
+#         # panel.grid.major.y = element_line(linetype = "dotted", linewidth = .1),
+#         legend.title = element_text(size = 10))  +
+#   scale_x_discrete(
+#     expand = expansion(add = 1), 
+#     labels = function(x){str_replace(x, "WT", "control")},
+#     name = NULL) +
+#   scale_y_continuous(name = "nmol C / min / g BW\n",
+#                      n.breaks = 7,
+#                      expand = expansion(mult = c(0.05, 0.05))) +
+#   
+#   # as the consumption and production calculated values are not perfectly the same
+#   # panels thus are not perfectly aligned in the center. To fix this:
+#   # add point to mark the boundary of the plots
+#   # so that the y = 0 is all aligned up across panels
+#   geom_point(data = d.edge, 
+#              aes(x = factor("ob/ob"), y = edge * 20/1000), 
+#              inherit.aes = F, size = 0, alpha = 0) +
+#   geom_point(data = d.edge, 
+#              aes(x = factor("ob/ob"), y = -edge * 20/1000), 
+#              inherit.aes = F, size = 0, alpha = 0) 
+# 
+# 
+# 
+# 
+# # g lean mass
+# d.production.consumption.mirror.normalized %>% 
+#   ggplot(aes(x = x.axis, y = nmol.min.gLean, fill = myfill)) +
+#   geom_col(color = "black") +
+#   geom_errorbar(aes(ymax = err.Y.gLean,
+#                     ymin = ifelse(nmol.min.gLean > 0, 
+#                                   err.Y.gLean - nmol.min.gLean.SEM,
+#                                   err.Y.gLean + nmol.min.gLean.SEM)),
+#                 width = .4) +
+#   geom_hline(yintercept = 0, linewidth = 1) +
+#   facet_wrap(~ about, scales = "free_y", nrow = 2) +
+#   scale_fill_manual(
+#     values = color.Compounds, 
+#     name = "source of production, \nor destiny of consumption",
+#     labels = c("non-Ox sink" = "Storage (recycle)",
+#                "storage" = "Storage (release)")) +
+#   theme_minimal(base_size = 14) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         strip.background = element_blank(),
+#         strip.text = element_text(face = "bold", size = 14),
+#         axis.text = element_text(color = "black", size = 13),
+#         axis.ticks = element_line(color = "snow4"),
+#         panel.spacing = unit(20, "pt"),
+#         panel.grid = element_blank(),
+#         # panel.grid.minor.y = element_line(linetype = "dashed", linewidth = .1),
+#         # panel.grid.major.y = element_line(linetype = "dotted", linewidth = .1),
+#         legend.title = element_text(size = 10))  +
+#   scale_x_discrete(
+#     expand = expansion(add = 1), 
+#     labels = function(x){str_replace(x, "WT", "control")},
+#     name = NULL) +
+#   scale_y_continuous(name = "nmol C / min / g lean mass\n",
+#                      n.breaks = 7,
+#                      expand = expansion(mult = c(0.05, 0.05))) +
+#   
+#   # as the consumption and production calculated values are not perfectly the same
+#   # panels thus are not perfectly aligned in the center. To fix this:
+#   # add point to mark the boundary of the plots
+#   # so that the y = 0 is all aligned up across panels
+#   geom_point(data = d.edge, 
+#              aes(x = factor("ob/ob"), y = edge * 35/1000), 
+#              inherit.aes = F, size = 0, alpha = 0) +
+#   geom_point(data = d.edge, 
+#              aes(x = factor("ob/ob"), y = -edge * 35/1000), 
+#              inherit.aes = F, size = 0, alpha = 0) 
+# 
+# 
+# 
+# # fat mass 
+# d.production.consumption.mirror.normalized %>% 
+#   ggplot(aes(x = x.axis, y = nmol.min.gFat, fill = myfill)) +
+#   geom_col(color = "black") +
+#   geom_errorbar(aes(ymax = err.Y.gFat,
+#                     ymin = ifelse(nmol.min.gLean > 0, 
+#                                   err.Y.gFat - nmol.min.gFat.SEM,
+#                                   err.Y.gFat + nmol.min.gFat.SEM)),
+#                 width = .4) +
+#   geom_hline(yintercept = 0, linewidth = 1) +
+#   facet_wrap(~ about, scales = "free_y", nrow = 2) +
+#   scale_fill_manual(
+#     values = color.Compounds, 
+#     name = "source of production, \nor destiny of consumption",
+#     labels = c("non-Ox sink" = "Storage (recycle)",
+#                "storage" = "Storage (release)")) +
+#   theme_minimal(base_size = 14) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         strip.background = element_blank(),
+#         strip.text = element_text(face = "bold", size = 14),
+#         axis.text = element_text(color = "black", size = 13),
+#         axis.ticks = element_line(color = "snow4"),
+#         panel.spacing = unit(20, "pt"),
+#         panel.grid = element_blank(),
+#         # panel.grid.minor.y = element_line(linetype = "dashed", linewidth = .1),
+#         # panel.grid.major.y = element_line(linetype = "dotted", linewidth = .1),
+#         legend.title = element_text(size = 10))  +
+#   scale_x_discrete(
+#     expand = expansion(add = 1), 
+#     labels = function(x){str_replace(x, "WT", "control")},
+#     name = NULL) +
+#   scale_y_continuous(name = "nmol C / min / g fat mass\n",
+#                      n.breaks = 7,
+#                      expand = expansion(mult = c(0.05, 0.05))) +
+#   
+#   # as the consumption and production calculated values are not perfectly the same
+#   # panels thus are not perfectly aligned in the center. To fix this:
+#   # add point to mark the boundary of the plots
+#   # so that the y = 0 is all aligned up across panels
+#   geom_point(data = d.edge, 
+#              aes(x = factor("ob/ob"), y = edge * 35/1000), 
+#              inherit.aes = F, size = 0, alpha = 0) +
+#   geom_point(data = d.edge, 
+#              aes(x = factor("ob/ob"), y = -edge * 35/1000), 
+#              inherit.aes = F, size = 0, alpha = 0) 
+
 
 
 

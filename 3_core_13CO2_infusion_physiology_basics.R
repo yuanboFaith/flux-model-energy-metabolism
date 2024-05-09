@@ -1,6 +1,6 @@
 rm(list = ls())
 
-library(plyr)
+# library(plyr)
 library(rebus)
 library(viridis)
 library(lubridate)
@@ -9,7 +9,6 @@ library(purrr)
 library(broom)
 library(RColorBrewer)
 library(splines)
-library(pryr)
 library(cowplot)
 library(gridExtra)
 library(ggrepel)
@@ -206,10 +205,10 @@ d.recovery.infusion = d.infusion.expCurve %>%
   filter(tracer == "Glucose" & time.h >= 4 |
            tracer != "Glucose" & time.h > 0) %>% 
   group_by(phenotype, tracer, inj.umol.13C.atoms, cage, round) %>% 
-  summarise(P1.umol.min.mean = mean(P1.umol.min),
-            P1.umol.min.SD = sd(P1.umol.min)) %>% 
-  mutate(recovery.infuse = P1.umol.min.mean / inj.umol.13C.atoms,
-         recovery.infuse.SD = P1.umol.min.SD / inj.umol.13C.atoms)
+  dplyr::summarise(P1.umol.min.mean = mean(P1.umol.min),
+                   P1.umol.min.SD = sd(P1.umol.min)) %>% 
+  dplyr::mutate(recovery.infuse = P1.umol.min.mean / inj.umol.13C.atoms,
+                recovery.infuse.SD = P1.umol.min.SD / inj.umol.13C.atoms)
 
 
 # plot recovery of infusion
@@ -563,9 +562,9 @@ plt.recovery.bolus.infusion_3pheno =
   scale_color_manual(values = c("grey30" ,   "chocolate1" , "deepskyblue3"))  +
   scale_fill_manual(values = c("grey30" , "chocolate1" , "deepskyblue4"))  +
   labs(y = "13CO2 recovery fraction\n") +
-  scale_shape_manual(values = c(21, 23)) +
-  guides(shape = guide_legend(override.aes = list(
-    size = 4, stroke = 1, fill = c("black", "white"))))
+  scale_shape_manual(values = c(21, 23)) 
+# guides(shape = guide_legend(override.aes = list(
+#   size = 4, stroke = 1, fill = c("black", "white"))))
 
 plt.recovery.bolus.infusion_3pheno
 
@@ -1166,7 +1165,7 @@ ggsave(filename = "basic physiology.pdf",
 # ANCOVA analysis
 d.energyExpenditure.selected <- d.energyExpenditure %>% ungroup() %>% 
   select(phenotype, mouseID, CO2.L.min, O2.L.min, cal.min, BW, RER) 
-  
+
 
 # plot
 d.energyExpenditure.selected %>%
@@ -1208,7 +1207,105 @@ d.13C.info <- left_join(d.inj.info, d.inf.info) %>% as.data.frame()
 
 # output useful information
 
+
+
+# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-
+
+# BODY COMPOSITION
+
+# dataset of body composition by MRI
+d.bodyComposition <- read_excel(
+  "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/body composition.xlsx") %>% 
+  mutate(phenotype = factor(phenotype, levels = ordered.phenotype))
+
+
+# mean and SD of mass of fat and lean tissues
+d.bodyComposition.tidy <- d.bodyComposition %>%  
+  group_by(phenotype) %>% 
+  summarise(across(c(fat, lean),
+                   .fn = list(mean = ~mean(.x), sd = ~sd(.x)))
+  ) %>% 
+  pivot_longer(-phenotype, names_sep = "_",
+               names_to = c("part", ".value")) %>% 
+  # error bar position
+  group_by(phenotype) %>% 
+  arrange(desc(part)) %>% 
+  mutate(y.error = cumsum(mean))
+
+# plot
+plt.fat.lean <- d.bodyComposition.tidy %>% 
+  ggplot(aes(x = phenotype, y = mean, fill = part)) +
+  geom_col(color = "black") +
+  geom_errorbar(aes(ymin = y.error - sd, ymax = y.error),
+                width = .2) +
+  theme.myClassic +
+  scale_y_continuous(expand = expansion(mult = 0),
+                     breaks = seq(0, 70, 10)) +
+  scale_fill_manual(values = c("fat" = "snow2", "lean" = "snow4")) +
+  labs(y = "mass (g)")
+
+plt.fat.lean
+
+# add labels
+plt.fat.lean.labeled <- plt.fat.lean + geom_text(
+  aes(label = round(mean, 1)), 
+  position = position_stack(vjust = .5), color = "cyan") 
+plt.fat.lean.labeled
+
+
+# calculate fraction of fat and lean - ------------------------
+d.bodyComposition.summary <- d.bodyComposition %>% 
+  mutate(sum = fat + lean,
+         fat.frac = fat/sum,
+         lean.frac = lean / sum) %>% 
+  group_by(phenotype) %>% 
+  summarise(across(contains("frac"), 
+                   .fn = list(
+                     mean = ~ mean(.x, na.rm = T), # calcualte the mean
+                     sd = ~ sd(.x, na.rm = T))))  # calculate standard deviation
+# tidy up
+d.bodyComposition.summary.tidy <- d.bodyComposition.summary %>% 
+  pivot_longer(-phenotype, names_to = c("part", ".value"), names_sep = "_") %>% 
+  group_by(phenotype) %>% 
+  arrange(desc(part)) %>% 
+  mutate(y.error = cumsum(mean)) %>% 
+  mutate(part = str_remove(part, ".frac"))
+
+# plot of distribution fraction
+plt.fat.lean.frac <- d.bodyComposition.summary.tidy %>% 
+  ggplot(aes(x = phenotype, y = mean, fill = part)) +
+  geom_col(color = "black") +
+  geom_errorbar(aes(ymin = y.error - sd, ymax = y.error),
+                width = .2) +
+  theme.myClassic +
+  scale_y_continuous(expand = expansion(mult = 0),
+                     breaks = seq(0, 1, .2)) +
+  scale_fill_manual(values = c("fat" = "snow2", "lean" = "snow4")) +
+  labs( y = "fraction")
+
+plt.fat.lean.frac
+
+# add label
+plt.fat.lean.frac.labeled <- plt.fat.lean.frac + geom_text(
+  aes(label = round(mean*100, 1)), 
+  position = position_stack(vjust = .5), color = "cyan") 
+
+plt.fat.lean.frac.labeled
+
+# plot all
+plot_grid(plt.fat.lean.labeled + theme(legend.position = "bottom"), 
+          plt.fat.lean.frac.labeled + theme(legend.position = "bottom"))
+
+
+# add labels
+
+
+
+# export the data
 save(d.energyExpenditure, func.plt.basicsPhysiology, d.13C.info, d.infusion.expCurve, 
+     # body composition
+     d.bodyComposition.summary.tidy, 
+     d.bodyComposition.tidy,
      file = "3_core_13CO2_infusion_physiology_basics.RData")
 
 

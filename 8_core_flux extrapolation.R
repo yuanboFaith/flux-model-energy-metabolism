@@ -199,9 +199,9 @@ func.plt.FA <- function(mydata, colwidth = .9){
   mydata %>% 
     ggplot(aes(x = phenotype, y = C.pct, fill = top3)) +
     geom_col(color = "black", position = position_stack(reverse = T), width =  colwidth) +
-    geom_text(aes(label = round(C.pct, 1) %>% paste("%")),
+    geom_text(aes(label = round(C.pct, 0) %>% paste("%")),
               position = position_stack(vjust = .5, reverse = T),
-              size = 5) +
+              size = 5, color = "black") +
     labs(y = "carbon % in NEFA", x = NULL) +
     scale_fill_manual(values = c("grey95", "pink", "turquoise", "yellow") %>% rev()) +
     guides(fill = guide_legend(reverse = T)) +
@@ -214,8 +214,10 @@ func.plt.FA <- function(mydata, colwidth = .9){
 plt.FA.composition.WT <- d.FA.carbon_pct.summary %>% 
   filter(phenotype == "WT") %>% func.plt.FA(colwidth = .5) +
   guides(fill = guide_legend(nrow = 4)) +
-  coord_flip() +
-  theme(plot.margin = margin(rep(10, 4))) 
+  coord_flip(clip = "off") +
+  theme(plot.margin = margin(rep(10, 4)),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) 
 
 plt.FA.composition.WT
 

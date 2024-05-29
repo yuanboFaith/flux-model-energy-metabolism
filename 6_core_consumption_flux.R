@@ -731,5 +731,52 @@ write.xlsx(x = d.art.vs.tail.ratio.atom.summary.paper %>%
 
 
 
+
+# Compare the overall and direct oxidation flux
+x1 <- d.ox.sink.overal.2 %>% 
+  filter(phenotype == "WT" & destiny == "ox.overal") %>% 
+  ungroup() %>% 
+  select(Compound, nmol.min.animal, nmol.min.animal.SEM) %>% 
+  mutate(type = "overall")
+
+x2 <- d.flx.CO2.nonOx.sink %>% 
+  filter(phenotype == "WT" & destiny == "CO2") %>% 
+  ungroup() %>% 
+  select(Compounds, nmol.min.animal.mean, nmol.min.animal.SEM) %>% 
+  mutate(type = "direct") %>% 
+  rename(nmol.min.animal = nmol.min.animal.mean, Compound = Compounds)
+
+bind_rows(x1, x2) %>% 
+  mutate(Compound = factor(Compound, levels = u$Compound)) %>% 
+  ggplot(aes(x = Compound, y = nmol.min.animal, fill = type)) +
+  geom_col(color = "black", width = .7, alpha = .5, position = position_dodge(.7)) +
+  geom_errorbar(aes(ymax = nmol.min.animal + nmol.min.animal.SEM,
+                    ymin = nmol.min.animal - nmol.min.animal.SEM),
+                width = .2,
+                position = position_dodge(.7)) +
+  scale_y_continuous(breaks = seq(0, 16000, 4000),
+                     position = "left",
+                     labels = function(x){x/1000},
+                     name = "oxidation (µmol C / min)",
+                     expand = expansion(mult = c(0, .1))) +
+  scale_fill_manual(values = c("orange", "black")) + # NOX for non-oxidative sink
+  theme.myClassic +
+  theme(
+    legend.text = element_text(size = 15),
+    legend.key.size = unit(20, "pt"),
+    axis.text = element_text(size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = c(.84, .8),
+    axis.title.y = element_text(margin = margin(r = 10, "pt")),
+    plot.margin = margin(l = 20)) +
+  labs(x = NULL) +
+  coord_cartesian(ylim = c(0, NA))
+  
+  
+ggsave(
+  filename = "direct and overall oxidation comparison.pdf",
+  path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures", 
+  width = 6, height = 3.5)
+
 # save the project
 save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/6_core_consumption_flux.RData")

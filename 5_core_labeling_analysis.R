@@ -259,12 +259,28 @@ flx.plot_labeling_enrichment.which.Tracer.Blood =
 
 # visualize: labeling of selected metabolite in venous or arterial blood during infusion of selected tracer
 flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "Glucose", mylabeled.compound = "Glucose",
+  plotBlood = "tail", enrichment_lower_bound = .5
+)
+
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
   my.infused.tracer = "Lactate", mylabeled.compound = "Lactate",
   plotBlood = "art", enrichment_lower_bound = .5
 )
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
   my.infused.tracer = "C16:0", mylabeled.compound = "C16:0",
+  plotBlood = "tail", enrichment_lower_bound = .5
+)
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "C18:1", mylabeled.compound = "C18:1",
+  plotBlood = "tail", enrichment_lower_bound = .5
+)
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "3-HB", mylabeled.compound = "3-HB",
   plotBlood = "tail", enrichment_lower_bound = .5
 )
 
@@ -667,10 +683,13 @@ d.Fcirc_standard.atom.summary[, 1:5] %>%
 d.Fcirc.standard.atom_art.or.tail = d.Fcirc.standard.atom_art.or.tail %>%  # plot in order of infused tracer
   mutate(infused.tracer = factor(infused.tracer, levels = ordered.Compound, ordered = F ))
 
+o <- d.Fcirc.standard.atom_art.or.tail %>% 
+  filter(phenotype %in% c("WT", "ob/ob", "HFD"))
+
 func.plt.Fcirc.Compound = function(yAxis = "Fcirc_animal") {
-  d.Fcirc.standard.atom_art.or.tail %>% 
+  o %>% 
+    # filter(infused.tracer == "C18:1") %>% 
     mutate(phenotype = factor(phenotype, levels = ordered.phenotype, ordered = F)) %>% 
-    filter(phenotype %in% c("WT", "ob/ob", "HFD")) %>% 
     ggplot(aes_string(x = "phenotype", y = yAxis, color = "phenotype", fill = "phenotype")) +
     
     stat_summary(fun = mean, fun.args = list(mult = 1),
@@ -711,10 +730,73 @@ plt.Fcirc_animal = func.plt.Fcirc.Compound(yAxis = "Fcirc_animal") +
 
 plt.Fcirc_animal
 
+
+# add statistic test
+d.Tukey.animal <- o %>% 
+  nest(-infused.tracer) %>% 
+  mutate(model = map(data, ~aov(formula = Fcirc_animal ~ phenotype, data = .)),
+         tukey = map(model, ~TukeyHSD(.))) %>% 
+  # extract statistics 
+  mutate(stats = map(tukey, ~pluck(., "phenotype") %>% 
+                       as.data.frame() %>% rownames_to_column(var = "group"))) %>% 
+  unnest(stats) %>% 
+  select(infused.tracer, group, `p adj`)
+
+d.Tukey.animal
+
+# calculate y position
+d.Tukey.animal2 <- o %>% 
+  # calculate max Fcirc value per comparision group
+  group_by(infused.tracer, phenotype) %>% 
+  summarise(max = max(Fcirc_animal)) %>% spread(phenotype, max) %>% 
+  mutate(`WT-HFD` = max(HFD, WT),
+         `ob/ob-HFD` = max(HFD, `ob/ob`),
+         `WT-ob/ob` = max(`ob/ob`, WT, HFD) * 1.15,
+         .keep = "unused") %>% 
+  pivot_longer(-infused.tracer, names_to = "group", values_to = "y") %>% 
+  # combine with the tukey data
+  left_join(d.Tukey.animal, ., by = c("group", "infused.tracer")) %>% 
+  # calculate x axis
+  separate(group, into = c("g1", "g2"), sep = "-") %>% 
+  mutate(across(c(g1, g2), ~factor(., levels = ordered.phenotype, exclude = "db/db")),
+         x.star = (as.numeric(g1) + as.numeric(g2))/2)
+
+# calculate significant stars
+func.generate_stars <- function(p_value) {
+  if (p_value < 0.0001) {
+    return("****")
+  } else if (p_value < 0.001) {
+    return("***")
+  } else if (p_value < 0.01) {
+    return("**")
+  } else if (p_value < 0.05) {
+    return("*")
+  } else {
+    return("")
+  }
+}
+
+d.Tukey.animal3 <- d.Tukey.animal2 %>% 
+  mutate(stars = map_chr(`p adj`, func.generate_stars))
+
+# add stars to the plot
+plt.Fcirc_animal +
+  geom_segment(data = d.Tukey.animal3 %>% filter( `p adj` < 0.05), 
+               aes(x = g1, xend = g2, y = y*1.13, yend = y*1.13), inherit.aes = F) +
+  geom_text(data = d.Tukey.animal3 %>% filter( `p adj` < 0.05),
+            aes(label = stars, 
+                x = x.star, 
+                y = y * 1.15),
+            size = 5,
+            inherit.aes = F) +
+  scale_y_continuous(labels = ~.x / 1000, 
+                     name = "circulatory turnover flux (µmol molecules / min / animal)\n",
+                     expand = expansion(mult = c(0, .1))) +
+  theme(legend.position = "bottom")
+
 ggsave(filename = "molecule Fcirc.pdf",
-       plot = plt.Fcirc_animal + theme(legend.position = "bottom"),
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 5.5, width = 9)
+       height = 5.5 * 1.1, width = 9 * 1.1)
 
 # plt.Fcirc_animal + theme(panel.spacing.y = unit(20, "pt"))
 
@@ -732,34 +814,94 @@ plt.Fcirc.atom = plot_grid(plt.Fcirc.perGram_BW.atom + labs(y = "nmol C-atoms / 
 # plt.Fcirc.atom
 
 
+
+# add statistic test
+d.Tukey.animal.Fcirc_atom <- o %>% 
+  nest(-infused.tracer) %>% 
+  mutate(model = map(data, ~aov(formula = Fcirc_atom.animal ~ phenotype, data = .)),
+         tukey = map(model, ~TukeyHSD(.))) %>% 
+  # extract statistics 
+  mutate(stats = map(tukey, ~pluck(., "phenotype") %>% 
+                       as.data.frame() %>% rownames_to_column(var = "group"))) %>% 
+  unnest(stats) %>% 
+  select(infused.tracer, group, `p adj`)
+
+d.Tukey.animal.Fcirc_atom
+
+# calculate y position
+d.Tukey.animal.Fcirc_atom2 <- o %>% 
+  # calculate max Fcirc value per comparision group
+  group_by(infused.tracer, phenotype) %>% 
+  summarise(max = max(Fcirc_atom.animal)) %>% spread(phenotype, max) %>% 
+  mutate(`WT-HFD` = max(HFD, WT),
+         `ob/ob-HFD` = max(HFD, `ob/ob`),
+         `WT-ob/ob` = max(`ob/ob`, WT, HFD) * 1.15,
+         .keep = "unused") %>% 
+  pivot_longer(-infused.tracer, names_to = "group", values_to = "y") %>% 
+  # combine with the tukey data
+  left_join(d.Tukey.animal.Fcirc_atom, ., by = c("group", "infused.tracer")) %>% 
+  # calculate x axis
+  separate(group, into = c("g1", "g2"), sep = "-") %>% 
+  mutate(across(c(g1, g2), ~factor(., levels = ordered.phenotype, exclude = "db/db")),
+         x.star = (as.numeric(g1) + as.numeric(g2))/2)
+
+
+d.Tukey.animal.Fcirc_atom3 <- d.Tukey.animal.Fcirc_atom2 %>% 
+  mutate(stars = map_chr(`p adj`, func.generate_stars))
+
+# add stars to the plot
+plt.Fcirc_animal.atom +
+  geom_segment(data = d.Tukey.animal.Fcirc_atom3 %>% filter( `p adj` < 0.05), 
+               aes(x = g1, xend = g2, y = y*1.13, yend = y*1.13), inherit.aes = F) +
+  geom_text(data = d.Tukey.animal.Fcirc_atom3 %>% filter( `p adj` < 0.05),
+            aes(label = stars, 
+                x = x.star, 
+                y = y * 1.15),
+            size = 5,
+            inherit.aes = F) +
+  scale_y_continuous(labels = ~.x / 1000, 
+                     name = "µmol C / min / animal\n",
+                     expand = expansion(mult = c(0, .1))) +
+  theme(legend.position = "bottom")
+
+ggsave(filename = "Fcirc atom per animal.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 5.5 * 1.1, width = 9 * 1.1)
+
+
+
 d.Fcirc.standard.atom_art.or.tail %>% 
   group_by(Compound, phenotype) %>% 
-  summarise(Fcirc_g.BW.mean = mean(Fcirc_g.BW)) # %>% view()
+  summarise(Fcirc_g.BW.mean = mean(Fcirc_g.BW) %>% round(1),
+            Fcirc_g.BW.SD = sd(Fcirc_g.BW) %>% round(1) ) %>% 
+  mutate(Fcirc = paste0(Fcirc_g.BW.mean,  "±", Fcirc_g.BW.SD), .keep = "unused") %>% 
+  spread(phenotype, Fcirc) %>% 
+  select(Compound, WT)
 
 
 
-# add significant stars
-d.pairwise.T.Fcirc.molecule.animal <-  d.Fcirc.standard.atom_art.or.tail %>% 
-  filter(! infused.tracer %in% c("3-HB", "C18:2")) %>% 
-  # filter(infused.tracer == "Glycerol") %>% 
-  mutate(phenotype = factor(phenotype, levels = ordered.phenotype, ordered = F)) %>% 
-  filter(phenotype %in% c("WT", "ob/ob", "HFD")) %>% 
-  select(infused.tracer, phenotype, Fcirc_animal )
-
-
-d.pairwise.T.Fcirc.molecule.animal.stats <-  d.pairwise.T.Fcirc.molecule.animal %>% 
-  group_by(infused.tracer) %>% 
-  pairwise_t_test(Fcirc_animal ~ phenotype, paired = F, 
-                  p.adjust.method = "bonferroni") %>% 
-  select(-c(n1, n2, p, p.signif)) %>% 
-  add_xy_position(x = "phenotype") 
-
-
-d.pairwise.T.Fcirc.molecule.animal.stats %>% 
-  filter(p.adj < 0.05)
-
-d.pairwise.T.Fcirc.molecule.animal.stats %>% 
-  filter(infused.tracer == "Glutamine")
+# # add significant stars
+# d.pairwise.T.Fcirc.molecule.animal <-  d.Fcirc.standard.atom_art.or.tail %>% 
+#   filter(! infused.tracer %in% c("3-HB", "C18:2")) %>% 
+#   # filter(infused.tracer == "Glycerol") %>% 
+#   mutate(phenotype = factor(phenotype, levels = ordered.phenotype, ordered = F)) %>% 
+#   filter(phenotype %in% c("WT", "ob/ob", "HFD")) %>% 
+#   select(infused.tracer, phenotype, Fcirc_animal ) 
+# 
+# 
+# d.pairwise.T.Fcirc.molecule.animal.stats <-  d.pairwise.T.Fcirc.molecule.animal %>% 
+#   group_by(infused.tracer) %>% 
+#   pairwise_t_test(Fcirc_animal ~ phenotype, paired = F, 
+#                   p.adjust.method = "bonferroni") %>% 
+#   select(-c(n1, n2, p, p.signif)) %>% 
+#   add_xy_position(x = "phenotype") 
+# 
+# 
+# d.pairwise.T.Fcirc.molecule.animal.stats %>% 
+#   filter(p.adj < 0.05)
+# 
+# d.pairwise.T.Fcirc.molecule.animal.stats %>% 
+#   filter(infused.tracer == "Glutamine")
 
 
 # Plot bar plot of accumulated carbon atoms
@@ -1127,10 +1269,37 @@ d.Fcirc.BW <- d.Fcirc.standard.atom_art.or.tail %>%
   mutate(Compound = factor(Compound, levels = ordered.Compound))
 
 plt.Fcirc.BW <- d.Fcirc.BW %>% 
-  ggplot(aes(x = BW, y = Fcirc_animal, color = phenotype)) +
+  # filter(Compound == "Glucose") %>% 
+  ggplot(aes(x = BW, y = Fcirc_animal, color = phenotype, fill = phenotype)) +
   geom_point(size = 3, stroke = 1, alpha = .4) +
   facet_wrap(~Compound, scales = "free", nrow = 2) +
-  geom_smooth(method = "lm", se = F, show.legend = F) +
+  # geom_smooth(method = "lm", se = F, show.legend = F) +
+  scale_color_manual(values = color.phenotype) +
+  scale_fill_manual(values = color.phenotype) +
+  # convert nmol to µmol / min / animal
+  scale_y_continuous(labels = function(x){x/1000}) +
+  labs(y = "µmol molecules / min") +
+  theme(legend.position = "bottom",
+        panel.spacing = unit(7, units = "pt"),
+        axis.text = element_text(size = 16),
+        strip.text = element_text(size = 15))  +
+  ggalt::geom_encircle(s_shape = 1, expand = 0, alpha = .15, show.legend = F)
+plt.Fcirc.BW
+
+
+
+# average value
+d.Fcirc.BW %>% 
+  filter(Compound == "Glucose") %>% 
+  group_by(phenotype) %>% 
+  summarise(across(c(BW, Fcirc_animal), 
+                   .fns = list(mean = ~mean(.x), sd = ~sd(.x)))) %>% 
+  ggplot(aes(x = BW_mean, y = Fcirc_animal_mean, color = phenotype)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = Fcirc_animal_mean - Fcirc_animal_sd,
+                    ymax = Fcirc_animal_mean + Fcirc_animal_sd)) +
+  geom_errorbar(aes(xmin = BW_mean - BW_sd,
+                    xmax = BW_mean + BW_sd)) +
   scale_color_manual(values = color.phenotype) +
   # convert nmol to µmol / min / animal
   scale_y_continuous(labels = function(x){x/1000}) +
@@ -1138,8 +1307,11 @@ plt.Fcirc.BW <- d.Fcirc.BW %>%
   theme(legend.position = "bottom",
         panel.spacing = unit(7, units = "pt"),
         axis.text = element_text(size = 16),
-        strip.text = element_text(size = 15)) 
-plt.Fcirc.BW
+        strip.text = element_text(size = 15)) +
+  labs(x = "Body mass (g)")
+
+
+
 
 # Generalized linear model, with interaction term of BW and phenotype
 # none of the interaction terms are significant
@@ -1214,7 +1386,7 @@ plt.Fcirc.BW.pvalues <- d.GLM %>%
         axis.text = element_text(size = 15))
 plt.Fcirc.BW.pvalues
 
-plot_grid(plt.Fcirc.BW ,
+plot_grid(plt.Fcirc.BW,
           ggplot() + theme_void(),
           plt.Fcirc.BW.pvalues, nrow = 1, 
           rel_widths = c(3.9, .1, 1))
@@ -1249,9 +1421,9 @@ d.glycerol <- d.corrected.tidy2 %>%
 d.otherNutrients <- d.corrected.tidy2 %>% 
   filter(Compound != "Glycerol" & (!str_detect(MS.run, "G3P"))) %>% 
   filter(MS.run %in% c("11_ar_bd_EarlyElution", "12_ar_bd_LateElution", "18_bt-bw", "20_ce", "21_cf"))
-  
 
-                         
+
+
 # d.corrected.tidy2 %>%
 #   filter(Compound == "Glucose") %>%
 #   ggplot(aes(x = phenotype, y = intensity, color = phenotype)) +
@@ -1324,7 +1496,7 @@ ggsave(filename = "serum metabolomics.pdf",
        height = 6, width = 10)
 
 
- # Check concentration relationship with Fcirc
+# Check concentration relationship with Fcirc
 # use concentration in that specific infusion experiment, instead of using pooled data
 d.intensity.normalized <- d.corrected.tidy %>%
   filter(C_Label == 0, blood == "tail") %>%
@@ -1360,4 +1532,14 @@ ggsave(filename = "serum metabolomics_Fcirc.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 6, width = 10)
 
+
+
+
+
 save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/5_core_labeling_analysis.RData")
+
+
+
+
+
+

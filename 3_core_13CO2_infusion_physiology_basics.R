@@ -669,7 +669,7 @@ plt.fox.3phenotypes <- d.fox.infuse.bolus.subset %>%
                geom = "errorbar", position = position_dodge(dg),
                width = .3, color = "black") +
   # points
-  geom_quasirandom(shape = 21, color = "black", alpha = .6, 
+  geom_quasirandom(shape = 21, color = "black", alpha = .6, width = .1,
                    dodge.width = dg, size = 2, show.legend = F) +
   expand_limits(y = 0) +
   scale_y_continuous(breaks = seq(0, 1, .2), 
@@ -698,6 +698,7 @@ ggsave(filename = "13CO2_fox_bolus_infuse_3phenotypes.pdf",
        device = "pdf", height = 2.5, width = 12)
 
 
+
 # add label
 plt.fox.3phenotypes +
   geom_text(data = d.fox.infuse.bolus.subset %>%
@@ -710,7 +711,7 @@ plt.fox.3phenotypes +
 
 ggsave(filename = "13CO2_fox_bolus_infuse_3phenotypes_numbered.pdf", 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       device = "pdf", height = 3.7, width = 12) 
+       height = 3.7, width = 12) 
 
 
 # Check number of replicate
@@ -754,7 +755,7 @@ p2 <- p %>%
   mutate(y.position = ifelse(tracer == "Glutamine" & group1 == "HFD", 1.072, y.position))
 
 # add significant stars
-plt.fox.3phenotypes +
+plt.fox.3phenotypes.stars <- plt.fox.3phenotypes +
   # crossbar
   geom_segment(
     data = p2,
@@ -766,9 +767,24 @@ plt.fox.3phenotypes +
     aes(x = (xmin +  xmax)/2 - 4, y = y.position + 0.02, label = p.adj.signif), 
     inherit.aes = F)
 
+plt.fox.3phenotypes.stars
+
 ggsave(filename = "13CO2_fox_bolus_infuse_3phenotypes.pdf", 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       device = "pdf", height = 2.5, width = 12)
+       height = 3.7, width = 12)
+
+
+# style II
+plt.fox.3phenotypes +
+  facet_wrap(~tracer, scales = "free_x", nrow = 2) +
+  theme(legend.position = "bottom") +
+  scale_x_discrete(expand = expansion(mult = c(.5, .5))) +
+  theme(axis.text.x = element_blank())
+
+ggsave(filename = "13CO2_fox_bolus_infuse_3phenotypes_faceted.pdf", 
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 5.5 * 1.1, width = 9 * 1.1)
+
 
 
 # # Pool the recovery from both I.V. bolus injection and infusion

@@ -19,7 +19,6 @@ library(ggpubr)
 library(tidyverse)
 
 
-
 # Load my mini R package vivoFlux
 setwd("/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/vivoFlux")
 devtools::load_all()
@@ -48,14 +47,14 @@ theme.myClassic <-  theme_classic() +
 
 ordered.phenotype = factor(c("WT", "HFD", "ob/ob",  "db/db"), ordered = T)
 color.phenotype = c("snow4", "chocolate1", "deepskyblue3",  "firebrick2")
-color.phenotype %>% show_col()
 names(color.phenotype) = ordered.phenotype
 
 
 ordered.Compound = c(
   "Glucose", "Lactate",  "Glycerol","Alanine", "Glutamine", "3-HB", "Acetate", 
   "C16:0", "C18:1", "C18:2", "Valine",
-  "storage", "CO2", "non-Ox sink")
+  "storage", "CO2", "non-Ox sink"
+)
 
 # ordered.Compound.abbreviated = ordered.Compound %>% str_replace("3-HB", "3-HB")
 
@@ -72,16 +71,7 @@ color.Compounds[4] <- "olivedrab4" # "lightseagreen"
 color.Compounds[5] <- "mistyrose"
 
 color.Compounds %>% show_col()
-# pal_nejm()(7) %>% show_col()
-
-# c("#0072B5FF", "steelblue") %>% show_col()
-# c("#0072B5FF", "steelblue") %>% show_col()
-
 names(color.Compounds) = ordered.Compound
-
-
-
-
 
 
 
@@ -91,14 +81,11 @@ names(ph) = c("L", "O", "H", "d")
 
 
 
-
 # Basic mouse and sample documentation
 path.infusion.surgery = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/data_serum labeling mouse ID.xlsx"
 d.mouse = read_excel(path.infusion.surgery, sheet = "mouse data")
 d.infusion_rounds = read_excel(path = path.infusion.surgery, sheet = "infusion rounds",
-                               # skip = 7, 
-                               # range = "A8:O492",
-                               range = "A8:F525")
+                               range = "A8:F543")
 d.standardInfusionParameters = read_excel(path.infusion.surgery, sheet = "infusion parameters")
 
 
@@ -146,7 +133,7 @@ d.corrected.tidy.1 = func.combine_sample_ID(
 
 # Sheet 2: RU analysis in Feb 2022
 list.corrected.2 = read_excel(path.labeling, sheet = "RU_x-aa") %>% 
-  select(-c("z-tail-O1","aa-art-O3", "aa-tail-O3")) %>%  # glucose labeling only 3~4%; signifiant mice age by time of infusion, button leaking in O1 in Dec 2021 - Feb 2022 glucose clamp study; 
+  select(-c("z-tail-O1","aa-art-O3", "aa-tail-O3")) %>%  # glucose labeling only 3~4%; significant mice age by time of infusion, button leaking in O1 in Dec 2021 - Feb 2022 glucose clamp study; 
   flx.subtract_background(blankSamples =  c("Blank1",	"Blank3",	"Blank4")) %>% 
   natural_abundance_correction(resolution = 70000)
 
@@ -477,7 +464,6 @@ d.corrected.tidy.20 = func.combine_sample_ID(
     gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
   mutate(MS.run = "20_ce")
 
-
 # sheet 21: cf
 d21 = read_excel(path.labeling, sheet = "cf")
 list.corrected.21 = d21 %>% 
@@ -492,6 +478,50 @@ d.corrected.tidy.21 = func.combine_sample_ID(
     gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
   mutate(MS.run = "21_cf")
 
+
+# sheet 22: cg-ci
+d22 = read_excel(path.labeling, sheet = "cg-ci")
+list.corrected.22 = d22 %>% 
+  natural_abundance_correction(resolution = 12000)
+
+d.normalized.tidy.22 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.22$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.22 = func.combine_sample_ID(
+  dataset = list.corrected.22$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "22_cg-ci")
+
+
+# sheet 23: hyperinsulinemia (analyzed separately, not included in the compiled dataset)
+d23 = read_excel(path.labeling, sheet = "hyperinsulin")
+list.corrected.23 = d23 %>% 
+  natural_abundance_correction(resolution = 12000)
+
+d.normalized.tidy.23 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.23$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.23 = func.combine_sample_ID(
+  dataset = list.corrected.23$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "hyperinsulin")
+
+
+# sheet 24: gh, C16:0 infusion
+d24 = read_excel(path.labeling, sheet = "gh")
+list.corrected.24 = d24 %>% 
+  natural_abundance_correction(resolution = 12000)
+
+d.normalized.tidy.24 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.24$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.24 = func.combine_sample_ID(
+  dataset = list.corrected.24$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "gh")
 
 
 
@@ -512,7 +542,7 @@ d.normalized.tidy = func.combine.tidies(inputList = list(
   d.normalized.tidy.9,  d.normalized.tidy.10, d.normalized.tidy.11, d.normalized.tidy.12, 
   d.normalized.tidy.13, d.normalized.tidy.14, d.normalized.tidy.15, d.normalized.tidy.16,
   d.normalized.tidy.17, d.normalized.tidy.18, d.normalized.tidy.19, d.normalized.tidy.20,
-  d.normalized.tidy.21), 
+  d.normalized.tidy.21, d.normalized.tidy.22), 
   cumulator = cumulator)
 
 cumulator = NULL
@@ -524,13 +554,14 @@ d.corrected.tidy = func.combine.tidies(inputList = list(
   d.corrected.tidy.9,  d.corrected.tidy.10, d.corrected.tidy.11, d.corrected.tidy.12,
   d.corrected.tidy.13, d.corrected.tidy.14, d.corrected.tidy.15, d.corrected.tidy.16,
   d.corrected.tidy.17, d.corrected.tidy.18, d.corrected.tidy.19, d.corrected.tidy.20,
-  d.corrected.tidy.21),
+  d.corrected.tidy.21, d.corrected.tidy.22),
   cumulator = d.corrected.tidy)
 
 d.corrected.tidy$blood %>% unique()
 # check duplication
 d.normalized.tidy %>% duplicated() %>% sum(); d.corrected.tidy %>% duplicated() %>% sum()
 
+d.corrected.tidy$infusion_round %>% unique()
 
 
 
@@ -595,12 +626,13 @@ d.normalized.tidy <- d.normalized.tidy %>%
   filter(!(infused.tracer == "C18:2" & !infusion_round %in% c("bt", "bu", "bw") ))
 
 
-# keep C18:1 K (the free package) data only in rounds ce, cf, where lock solution was used, and blood can be drawn from the cathether 
+# keep C18:1 K (the free package) data only in rounds ce, cf, where lock solution was used, and blood can be drawn from the catheter 
+# note round ci is in particular for HFD with body weight matched with ob/ob
 d.corrected.tidy <- d.corrected.tidy %>% 
-  filter(!(infused.tracer == "C18:1" & !infusion_round %in% c("ce", "cf") ))
+  filter(!(infused.tracer == "C18:1" & !infusion_round %in% c("ce", "cf", "ci") ))
 
 d.normalized.tidy <- d.normalized.tidy %>% 
-  filter(!(infused.tracer == "C18:1" & !infusion_round %in% c("ce", "cf") ))
+  filter(!(infused.tracer == "C18:1" & !infusion_round %in% c("ce", "cf", "ci") ))
 
 
 
@@ -610,6 +642,7 @@ d.corrected.tidy = d.corrected.tidy %>%
 
 d.normalized.tidy = d.normalized.tidy %>% 
   filter(! ( (infused.tracer == "C16:0") & (infusion_round %in% c("q", "t")) ))
+
 
 
 

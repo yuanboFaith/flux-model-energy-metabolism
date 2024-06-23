@@ -747,6 +747,12 @@ plt.destiny.g.BW
 plt.WT.consumption <-  d.destiny.totalProduction %>% 
   filter(phenotype == "WT") %>% ungroup() %>% 
   mutate(Compounds = fct_reorder(Compounds, nmol.min.animal.mean, .fun = sum, .desc = T)) %>% 
+  
+  # due to small analytically error, the compounds are ordered slightly different from the production flux 
+  # i.e., glucose and C16:0 is swapped
+  # here glucose is manually positioned behind C16:0
+  mutate(Compounds = fct_relevel(Compounds, "Glucose", after = 7)) %>% 
+  
   ggplot(aes(x = Compounds, y = nmol.min.animal.mean, fill = destiny)) +
   geom_bar(stat = "identity", color = "black") +
   geom_errorbar(aes(ymin = errorPosition.animal - nmol.min.animal.SEM,

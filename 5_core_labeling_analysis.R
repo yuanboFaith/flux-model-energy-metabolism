@@ -269,20 +269,51 @@ flx.plot_labeling_enrichment.which.Tracer.Blood(
   plotBlood = "art", enrichment_lower_bound = .5
 )
 
+
 flx.plot_labeling_enrichment.which.Tracer.Blood(
   my.infused.tracer = "C16:0", mylabeled.compound = "C16:0",
   plotBlood = "tail", enrichment_lower_bound = .5
 )
+
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
   my.infused.tracer = "C18:1", mylabeled.compound = "C18:1",
   plotBlood = "tail", enrichment_lower_bound = .5
 )
 
+
 flx.plot_labeling_enrichment.which.Tracer.Blood(
   my.infused.tracer = "3-HB", mylabeled.compound = "3-HB",
   plotBlood = "tail", enrichment_lower_bound = .5
 )
+
+
+
+# summarize and export averaged isotopomer distribution
+d.isotopomer <-  d.normalized.tidy %>% 
+  group_by(phenotype, infused.tracer, Compound, C_Label) %>% 
+  summarise(enrich.pct.mean = mean(enrichment*100) %>% round(1),
+            enrich.pct.sd = sd(enrichment*100) %>% round(1)) %>% 
+  # if the mean is zero, do not show SD
+  mutate(enrich = ifelse(enrich.pct.mean == 0, 0, str_c(enrich.pct.mean, " ± ", enrich.pct.sd)),
+         .keep = "unused") %>% 
+  mutate(infused.tracer = factor(infused.tracer, levels = ordered.Compound),
+         Compound = factor(Compound, levels = ordered.Compound)) %>% 
+  arrange(infused.tracer, Compound)
+
+# convert to wider format
+d.isotopomer.spread <- d.isotopomer %>% 
+  pivot_wider(names_from = C_Label, values_from = enrich)
+
+# export as excel
+d.isotopomer.spread %>% 
+  rename(`infused tracer` = infused.tracer,
+         `labeled compound` = Compound) %>% 
+  as.data.frame() %>%  
+  write.xlsx(
+    showNA = F,
+    file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/isotopologues.xlsx"
+  )
 
 
 

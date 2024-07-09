@@ -1137,6 +1137,32 @@ plt.glycemia <- (plt.glycemia +
 plt.glycemia
 
 
+
+# insulin level at basal condition
+d.insulin <- read_excel("/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/hyperinsulinemia.xlsx",
+                        sheet = "insulin_phenotypes", 
+                        range = "A12:E31")
+
+plt.insulin <- d.insulin %>% 
+  mutate(phenotype = factor(phenotype, levels = ordered.phenotype)) %>% 
+  func.plt.basicsPhysiology(whichY = "conc_corrected", mytitle = "insulin") +
+  scale_y_continuous(
+    name = "ng / mL",
+    breaks = seq(0, 70, 10), 
+    limits = c(0, NA), 
+    expand = expansion(mult = c(0, .1)))
+
+
+plt.insulin <- (plt.insulin +
+                  geom_segment(data = s <- d.insulin %>% ungroup() %>% 
+                                 pairwise_t_test(conc_corrected ~ phenotype, p.adjust.method = "bonferroni") %>% 
+                                 func.sig1(y.max.up = -20, y.min.down = 50),
+                               aes(x = xmin, xend = xmax, y = y.position, yend = y.position), inherit.aes = F))  %>% 
+  func.sig2()
+
+plt.insulin
+
+
 # - total energy expenditure
 d.energyExpenditure <- d.infusion.stable.summary1 %>% 
   mutate(O2.L.min = O2.umol.min / 10^6 * 22.4,
@@ -1164,17 +1190,25 @@ plt.calorie
 
 # plot all together
 b <- ggplot() + theme_void()
-p1 <- plot_grid(plt.BW , b, plt.glycemia , b, plt.CO2, 
-                nrow = 1, rel_widths = c(1, .1, 1, .1, 1))
 
-p2 <- plot_grid(plt.O2 , b, plt.RER , b, plt.calorie, 
-                nrow = 1, rel_widths = c(1, .1, 1, .1, 1))
+p1 <- plot_grid(plt.BW , b, 
+                plt.glycemia , 
+                b,  plt.insulin, 
+                b, plt.CO2, 
+                nrow = 1, rel_widths = c(.85, .1, 1, .1, .85, .1,  1))
+p1
+p2 <- plot_grid(b, plt.O2 , b, plt.RER , b, plt.calorie, b,
+                nrow = 1, 
+                rel_widths = c(.3, 1, .1,
+                               .85, .1, 
+                               1, .3))
 
+p2
 plot_grid(p1, p2, nrow = 2, align = "v")
 
 ggsave(filename = "basic physiology.pdf", 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 8, width = 14)
+       height = 8, width = 15)
 
 
 
@@ -1317,8 +1351,11 @@ plot_grid(plt.fat.lean.labeled + theme(legend.position = "bottom"),
 
 
 
+
+
 # export the data
-save(d.energyExpenditure, func.plt.basicsPhysiology, d.13C.info, d.infusion.expCurve, 
+save(d.energyExpenditure, func.plt.basicsPhysiology, d.13C.info, d.infusion.expCurve,
+     d.infusion.stable.summary1,
      # body composition
      d.bodyComposition.summary.tidy, 
      d.bodyComposition.tidy,

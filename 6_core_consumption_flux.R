@@ -22,6 +22,22 @@ library(tidyverse)
 
 load(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/5_core_labeling_analysis.RData")
 
+
+
+# combine with body weight
+# add body weight
+d.BW = d.normalized.tidy %>% 
+  select(mouse_ID, phenotype, BW, infused.tracer) %>% 
+  distinct() %>% 
+  group_by(phenotype, infused.tracer) %>% 
+  summarise(BW.mean = mean(BW),
+            BW.sd = sd(BW)) %>% 
+  rename(Compounds = infused.tracer)
+d.BW
+
+
+
+
 # Integrate with 13CO2 data: consumption fate of circulating nutrients on a whole body level
 d.CO2.fox = read_excel(
   "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/nutrients 13CO2 recovery and fox.xlsx", 
@@ -41,8 +57,10 @@ d.CO2.fox <- d.CO2.fox %>%
 d.ox.sink.overal.0 <-  d.Fcirc_standard.atom.summary %>% 
   # select the classic Fcirc-atom quantification
   select(Compound, phenotype, n.rep, contains("atom"), -contains("position")) %>% 
+  
   # select whole animal data
   select(-contains("g.BW")) %>% 
+  
   mutate(Fcirc_animal.atom.SEM = Fcirc_animal.atom.sd / sqrt(n.rep)) %>% 
   select(-c(Fcirc_animal.atom.sd, n.rep)) %>% 
   left_join(d.CO2.fox %>% rename(Compound = infused.tracer) %>% select(-c(n.rep, method, fox.SD)),
@@ -87,6 +105,7 @@ u <- d.ox.sink.overal.2 %>% ungroup() %>%
   mutate(Compound = fct_reorder(Compound, nmol.min.animal, sum, .desc = T)) %>% 
   arrange(Compound)
 
+# WT flux per animal
 plt.overal.ox.sink.WT.dodge <-   
   d.ox.sink.overal.2 %>% ungroup() %>% 
   filter(phenotype == "WT") %>% 
@@ -122,6 +141,26 @@ ggsave(
   filename = "ox.sink.overal.WT_dodge.pdf",
   path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures", 
   width = 7/1.1, height = 3.5/1.1)
+
+
+
+# WT flux per g BW
+
+d.BW %>% group_by(phenotype) %>% summarise(BW = mean(BW.mean))
+
+plt.overal.ox.sink.WT.dodge +
+  scale_y_continuous(
+    breaks = seq(0, 16000, 4000),
+    position = "right",
+    labels = function(x){x/1000},
+    name = "overal fluxes (µmol / min )",
+    expand = expansion(mult = c(0, .1)),
+    sec.axis = sec_axis(trans =  ~ . / 29, name = "nmol / min / g")) 
+
+ggsave(
+  filename = "ox.sink.overal.WT_dodge.gBW.pdf",
+  path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures", 
+  width = 7, height = 3.5/1.1)
 
 
 # plot 2: WT, bars stacked
@@ -198,7 +237,7 @@ plt.overal.ox.sink.3pheno +
   # add percentage
   geom_text(data = d.ox.sink.overal.2 %>% mutate(frac = nmol.min.animal /sum(nmol.min.animal) ) %>% 
               filter(phenotype != "db/db"),
-             aes(label = round(frac*100, 1) %>% paste("%")),
+            aes(label = round(frac*100, 1) %>% paste("%")),
             position = position_stack(vjust = .6), color = "cyan",
             size = 3)
 
@@ -278,7 +317,7 @@ func.flx.CO2.nonOx.sink = function(whichDestiny = "CO2"){
     # Check L matrix compounds order match with R.rec vector
     if(! (!rownames(mat_L.mean) == names(v_R.fox.mean)) %>% sum() == 0){stop("Compounds names not matching.")}
     
-     
+    
     # constraint matrix
     G = diag(1, nrow = mat.dim) # absolute fraction of oxidation >= 0
     H = rep(0, mat.dim) # flux to CO2 >= 0
@@ -367,6 +406,9 @@ ggsave(filename = "direct sink ox fitted error rel frac.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 6, width = 7)
 
+d.fitted.relErr.tidy %>% 
+  filter(destiny != "CO2") %>% 
+  filter(compound == "Lactate")
 
 
 # absolute flux to oxidation 
@@ -383,16 +425,7 @@ d.flx.CO2.nonOx.sink <- rbind(d.OX, d.NOS) %>%
          phenotype = factor(phenotype, levels = ordered.phenotype)) 
 
 
-# combine with body weight
-# add body weight
-d.BW = d.normalized.tidy %>% 
-  select(mouse_ID, phenotype, BW, infused.tracer) %>% 
-  distinct() %>% 
-  group_by(phenotype, infused.tracer) %>% 
-  summarise(BW.mean = mean(BW),
-            BW.sd = sd(BW)) %>% 
-  rename(Compounds = infused.tracer)
-d.BW
+
 
 # note that the direct OX and NOS fluxes are calculated based on all infusion data, 
 # but the body weight is stratified based on each tracer; this may lead to small differences vs. Tony's Fcirc values
@@ -572,30 +605,43 @@ d.energyExpenditure %>%
 
 
 # WT only
-plt.CO2.total.WT <- d.energyExpenditure %>% 
-  filter(phenotype == "WT") %>% 
-  filter(CO2.umol.min > 35) %>% # remove one outliner in WT
-  ggplot(aes(x = phenotype, y = CO2.umol.min, fill = phenotype)) + 
-  # mean
-  stat_summary(fun = mean, geom = "bar", alpha = .7, color = "black") +
-  # standard deviation
-  stat_summary(fun.data = mean_se, geom = "errorbar",
-               fun.args = list(mult = 1),
-               width = .3) +
-  # points
-  geom_quasirandom(show.legend = F, alpha = .5, shape = 21) +
-  scale_fill_manual(values = color.phenotype) +
-  facet_wrap(~phenotype) +
-  theme.myClassic +
-  theme(axis.title.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        legend.position = "none") +
-  coord_cartesian(clip = "off") +
-  scale_x_discrete(expand = expansion(add = .7)) +
-  scale_y_continuous(breaks = seq(0, 70, 10),
-                     limits = c(0, 70),
-                     expand = expansion(mult = c(0, .01))) 
+f.plt.WT.CO2 <- function(whichY){
+  d.energyExpenditure %>% 
+    filter(phenotype == "WT") %>% 
+    filter(CO2.umol.min > 35) %>% # remove one outliner in WT
+    ggplot(aes(x = phenotype, y = {{whichY}}, fill = phenotype)) + 
+    # mean
+    stat_summary(fun = mean, geom = "bar", alpha = .7, color = "black") +
+    # standard deviation
+    stat_summary(fun.data = mean_se, geom = "errorbar",
+                 fun.args = list(mult = 1),
+                 width = .3) +
+    # points
+    geom_quasirandom(show.legend = F, alpha = .5, shape = 21) +
+    scale_fill_manual(values = color.phenotype) +
+    facet_wrap(~phenotype) +
+    theme.myClassic +
+    theme(axis.title.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          legend.position = "none") +
+    coord_cartesian(clip = "off") +
+    scale_x_discrete(expand = expansion(add = .7)) +
+    scale_y_continuous(breaks = seq(0, 70, 10),
+                       limits = c(0, 70),
+                       expand = expansion(mult = c(0, .01))) 
+}
+
+# WT per animal
+plt.CO2.total.WT <- f.plt.WT.CO2(whichY = CO2.umol.min)
 plt.CO2.total.WT 
+
+# WT per g BW
+plt.CO2.total.WT.BW <- f.plt.WT.CO2(whichY = CO2.umol.min/ 29 ) +
+  scale_y_continuous(
+    breaks = seq(0, 3, .3),
+    expand = expansion(mult = c(0, .01)),
+    name = "CO2 umol / min /g BW") 
+plt.CO2.total.WT.BW 
 
 
 
@@ -633,7 +679,7 @@ plt.CO2.NOS.WT <-
 
 plt.CO2.NOS.WT
 
-ggsave(filename = "CO2 sink stacked nutrients WT.pdf",
+ggsave(filename = "CO2 sink stacked nutrients WT_gBW.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 4, width = 5)
 
@@ -771,8 +817,8 @@ bind_rows(x1, x2) %>%
     plot.margin = margin(l = 20)) +
   labs(x = NULL) +
   coord_cartesian(ylim = c(0, NA))
-  
-  
+
+
 ggsave(
   filename = "direct and overall oxidation comparison.pdf",
   path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures", 

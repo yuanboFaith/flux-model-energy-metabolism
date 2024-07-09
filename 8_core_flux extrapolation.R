@@ -351,27 +351,26 @@ plot_grid(
           axis.text = element_text(size = 15)), 
   
   # gap
-  ggplot() + theme_void(),
+  ggg <- ggplot() + theme_void(),
   
   # nutrient-wise contribution
-  plt.flx.CO2.nonOx.sink.animal.WT.2 + 
+  plt.flx.CO2.nonOx.sink.animal.WT.2.theme <- 
+    plt.flx.CO2.nonOx.sink.animal.WT.2 + 
     scale_x_discrete(expand = expansion(add = 1)) +
     theme(
       axis.title.x = element_blank(), 
       axis.text.x = element_blank(),
-      # axis.text.y = element_blank(),
-      # axis.line.y = element_blank(),
-      # axis.ticks.y = element_blank(),
       axis.ticks.x = element_blank(),
       axis.text = element_text(size = 15),
       legend.text = element_text(size = 14),
       panel.spacing = unit(-20, "pt")),
   
   # gap
-  ggplot() + theme_void(),
+  ggg,
   
   # category contribution
-  plt.category.OX.NOS.WT + 
+  plt.category.OX.NOS.WT.theme <- 
+    plt.category.OX.NOS.WT + 
     theme(panel.spacing = unit(-20, "pt"),
           axis.text = element_text(size = 15),
           legend.text = element_text(size = 14)), 
@@ -382,6 +381,80 @@ plot_grid(
 ggsave(filename = "OX NOS WT.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 3.7, width = 11.5)
+
+
+
+# -
+
+# Plot per gram body weight # -# -# -# -# -# -# -# -# -# -# -# -# -# -
+# define function to remove the right side y-axis
+f.removeRightYaxis <- function(p){
+  p + theme(axis.text.y.right = element_blank(),
+            axis.title.y.right = element_blank(),
+            axis.ticks.y = element_blank(),
+            axis.line.y.right = element_blank())
+}
+
+
+
+# update y axis into per gram body weight using average body weight mass 29 g for WT
+
+# <1> CO2 output
+# created at 6_core_consumption_flux.R file
+plt.CO2.total.WT.BW # normalized by body weight of each individual animal
+
+plt.CO2.total.WT.BW.theme.gBW <- plt.CO2.total.WT.BW + 
+  scale_x_discrete(expand = expansion(add = 1)) +
+  theme(axis.text.x = element_blank(),
+        panel.spacing = unit(-20, "pt"),
+        axis.text = element_text(size = 15)) +
+  coord_cartesian(ylim = c(0, 2.5))
+
+# plt.CO2.total.WT.BW.theme.gBW
+
+# <2> 10 nutrients Ox and Sink
+plt.flx.CO2.nonOx.sink.animal.WT.2.theme.gBW <- 
+  f.removeRightYaxis(
+    plt.flx.CO2.nonOx.sink.animal.WT.2.theme +
+      scale_y_continuous(
+        position = "right", name = "nmol/min/animal",
+        expand = expansion(mult = c(0, .1)),
+        sec.axis = sec_axis(trans = ~./29, 
+                            name = "umol C atom / min / g",
+                            breaks = seq(0, 2400, 300),
+                            labels =  function(x){x/1000}
+        )
+      ) +
+      coord_cartesian(ylim = c(0, 2200*30))
+  )
+
+# <3> per class of nutrients Ox and Sink
+plt.category.OX.NOS.WT.theme.gBW <- f.removeRightYaxis(
+  plt.category.OX.NOS.WT.theme +
+    scale_y_continuous(
+      position = "right", name = "nmol/min/animal",
+      expand = expansion(mult = c(0, .1)),
+      sec.axis = sec_axis(trans = ~./29, 
+                          name = "umol C atom / min / g",
+                          breaks = seq(0, 2500, 300),
+                          labels =  function(x){x/1000}
+      )
+    ) + 
+    coord_cartesian(ylim = c(0, 2200*30))
+)
+
+plot_grid(
+  plt.CO2.total.WT.BW.theme.gBW, ggg,
+  plt.flx.CO2.nonOx.sink.animal.WT.2.theme.gBW, ggg,
+  plt.category.OX.NOS.WT.theme.gBW,
+  nrow = 1, rel_widths = c(.8, .1, 2, .1, 2)
+)
+
+
+ggsave(filename = "OX NOS WT gBW.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 3.7, width = 11.5)
+
 
 
 

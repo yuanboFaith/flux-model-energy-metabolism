@@ -399,13 +399,31 @@ plt.source.WT <- d.directFlux_interConversion %>%
   guides(fill = guide_legend(reverse = F)) +
   labs(title = "direct sources of circulating nutrients\n", 
        y = " µmol C-atoms / animal / min)") 
-
-plt.source.WT 
+plt.source.WT
 
 ggsave(
   filename = "production source flux.WT.pdf",
   path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures", 
   width = 6.3, height = 5.5)
+
+
+# normalize by body weight --------
+plt.source.WT +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, .1)),
+    n.breaks = 8,
+    name = "C umol / min /animal",
+    position = "right",
+    labels = function(x){x / 1000},
+    sec.axis = sec_axis(trans = ~ . / 29, breaks = seq(0, 1000, 100),
+                        name = "C nmol / min / g BW")) 
+
+ggsave(
+  filename = "production source flux.WT_gBW.pdf",
+  path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures", 
+  width = 6.6, height = 5.5)
+
+
 
 
 
@@ -787,9 +805,26 @@ plt.WT.consumption <-  d.destiny.totalProduction %>%
 plt.WT.consumption
 
 ggsave(filename = "consumption fate WT.pdf",
-       plot = plt.WT.consumption, 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        width = 6.3, height = 5.5)
+
+
+
+# normalize WT flux by body weight -_-_-_-_-_-_-_-_-_-_-_-_-_
+plt.WT.consumption +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, .1)),
+    n.breaks = 8,
+    position = "right",
+    labels = function(x){x / 1000},
+    sec.axis = sec_axis(trans = ~ . / 29, breaks = seq(0, 1000, 100),
+                        name = "C nmol / min / g BW")) +
+  coord_cartesian(ylim = c(0, 26000))
+
+ggsave(filename = "consumption fate WT_gBW.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       width = 7, height = 5.5)
+
 
 
 
@@ -1125,19 +1160,24 @@ ggsave(filename = paste0("mirror ", "animal", ".pdf"),
 
 
 
-# normalize by g BW
+# normalize by g BW -------------------------------------------------
 func.mirror( y = "nmol.min.gBW",  # y axis
              err.Y = "err.Y.gBW", # accumulated y-axis position for error bars
              errorBar = "nmol.min.gBW.SEM", # the SEM for each conversion flux 
              norm.basis = "per g body weight", # the basis of normalization
              myEdge = 15, fig.width = 13)
 
-# normalize by lean mass
+
+
+
+# normalize by lean mass -------------------------------------------------
 func.mirror( y = "nmol.min.gLean",  # y axis
              err.Y = "err.Y.gLean", # accumulated y-axis position for error bars
              errorBar = "nmol.min.gLean.SEM", # the SEM for each conversion flux 
              norm.basis = "per g lean mass", # the basis of normalization
              myEdge = 35, fig.width = 13)
+
+
 
 # normalize by fat mass
 func.mirror( y = "nmol.min.gFat",  # y axis

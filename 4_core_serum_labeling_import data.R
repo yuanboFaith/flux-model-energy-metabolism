@@ -85,7 +85,7 @@ names(ph) = c("L", "O", "H", "d")
 path.infusion.surgery = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/data_serum labeling mouse ID.xlsx"
 d.mouse = read_excel(path.infusion.surgery, sheet = "mouse data")
 d.infusion_rounds = read_excel(path = path.infusion.surgery, sheet = "infusion rounds",
-                               range = "A8:F543")
+                               range = "A8:F567")
 d.standardInfusionParameters = read_excel(path.infusion.surgery, sheet = "infusion parameters")
 
 
@@ -524,6 +524,36 @@ d.corrected.tidy.24 = func.combine_sample_ID(
   mutate(MS.run = "gh")
 
 
+# sheet 25: da and dd, 16:0 infusion 
+d25 = read_excel(path.labeling, sheet = "da_dd")
+
+list.corrected.25 = d25 %>% natural_abundance_correction(resolution = 12000)
+
+d.normalized.tidy.25 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.25$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.25 = func.combine_sample_ID(
+  dataset = list.corrected.25$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "da_dd")
+
+
+# sheet 26: dc, glucose infusion (the raw MS files were incorrectly named as "bc")
+d26 = read_excel(path.labeling, sheet = "dc")
+
+list.corrected.26 = d26 %>% natural_abundance_correction(resolution = 12000)
+
+d.normalized.tidy.26 = func.combine_sample_ID(
+  dataset.tidy = list.corrected.26$Normalized %>% 
+    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+
+d.corrected.tidy.26 = func.combine_sample_ID(
+  dataset = list.corrected.26$Corrected %>% 
+    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+  mutate(MS.run = "dc")
+
+
 
 # Compile all imported data
 func.combine.tidies = function(inputList, cumulator) {
@@ -542,7 +572,7 @@ d.normalized.tidy = func.combine.tidies(inputList = list(
   d.normalized.tidy.9,  d.normalized.tidy.10, d.normalized.tidy.11, d.normalized.tidy.12, 
   d.normalized.tidy.13, d.normalized.tidy.14, d.normalized.tidy.15, d.normalized.tidy.16,
   d.normalized.tidy.17, d.normalized.tidy.18, d.normalized.tidy.19, d.normalized.tidy.20,
-  d.normalized.tidy.21, d.normalized.tidy.22), 
+  d.normalized.tidy.21, d.normalized.tidy.22, d.normalized.tidy.25, d.normalized.tidy.26), 
   cumulator = cumulator)
 
 cumulator = NULL
@@ -554,7 +584,7 @@ d.corrected.tidy = func.combine.tidies(inputList = list(
   d.corrected.tidy.9,  d.corrected.tidy.10, d.corrected.tidy.11, d.corrected.tidy.12,
   d.corrected.tidy.13, d.corrected.tidy.14, d.corrected.tidy.15, d.corrected.tidy.16,
   d.corrected.tidy.17, d.corrected.tidy.18, d.corrected.tidy.19, d.corrected.tidy.20,
-  d.corrected.tidy.21, d.corrected.tidy.22),
+  d.corrected.tidy.21, d.corrected.tidy.22, d.corrected.tidy.25, d.corrected.tidy.26),
   cumulator = d.corrected.tidy)
 
 d.corrected.tidy$blood %>% unique()
@@ -585,7 +615,8 @@ samples.toRemove = c(
   "bg-art-H32", "bg-art-H33", "bh-art-H36", "bh-art-H37",
   "bg-tail-H31",  "bg-tail-H32", "bg-tail-H33", "bh-tail-H35", "bh-tail-H36", "bh-tail-H37",
   "bw-tail-O105", # can draw blood, but canNOT push saline through button!
-  "ad-art-L8", "ad-tail-L8" # way too high labeling of lactate
+  "ad-art-L8", "ad-tail-L8", # way too high labeling of lactate
+  "da-tail-O5" # cann't draw blood from catheter; extremely low enrichment in blood
 )
 
 
@@ -618,7 +649,7 @@ d.normalized.tidy = func.RemoveOutlierSample(dataset = d.normalized.tidy, outlie
 
 
 
-# keep C18:2 data only in rounds bt, bu, and bw, where lock solution was used, and blood can be drawn from the cathether
+# keep C18:2 data only in rounds bt, bu, and bw, where lock solution was used, and blood can be drawn from the catheter
 d.corrected.tidy <- d.corrected.tidy %>% 
   filter(!(infused.tracer == "C18:2" & !infusion_round %in% c("bt", "bu", "bw") ))
 

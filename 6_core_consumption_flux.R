@@ -33,6 +33,7 @@ d.BW = d.normalized.tidy %>%
   summarise(BW.mean = mean(BW),
             BW.sd = sd(BW)) %>% 
   rename(Compounds = infused.tracer)
+
 d.BW
 
 

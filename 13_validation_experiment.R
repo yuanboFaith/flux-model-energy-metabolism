@@ -29,7 +29,7 @@ d.hyperInsulinemia <- d.normalized.tidy.23 %>%
   group_by(mouse_ID, time, .add = T) %>% 
   summarise(enrich = sum(enrich.weighted))
 
-
+d.corrected.tidy.23 %>% filter(C_Label == 0 & Compound == "C16:0") %>% view()
 
 # see additional processing in Excel 
 
@@ -126,7 +126,7 @@ d.gly.ins %>%
 
 ggsave(filename = "Clamp_glycemia_insulin.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 3.5, width = 6.5)
+       height = 3.5, width = 9)
 
 
 

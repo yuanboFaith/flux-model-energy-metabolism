@@ -185,7 +185,7 @@ d.ATP.totalAA <- d.flx.CO2.nonOx.sink %>%
 d.ATP.totalAA
 
 
-# 7.3kcal/mole
+# 12.2kcal/mole
 
 #- --- Cori cycle ---<>----<>----<>----<>----<>----<>-
 d.ATP.cori <- d.production.consumption %>% ungroup() %>% 
@@ -226,9 +226,9 @@ d.EE <- d.energyExpenditure %>% ungroup() %>%
   summarise(cal.min.SEM = sd(cal.min) / length(phenotype),
             cal.min = mean(cal.min)) %>% 
   # equivalent ATP of total energy expendigure, nmol/min/animal
-  # 7.3 kcal / mole ATP (hydrolysis of one phosphate bond) , or 7.3 cal / mmol
-  mutate(TEE.equi = cal.min / (7.3) * 10^6,
-         TEE.equi.SEM = cal.min.SEM / 7.3 * 10^6 ) %>% 
+  # 12.2 kcal / mole ATP (hydrolysis of one phosphate bond) , or 12.2 cal / mmol
+  mutate(TEE.equi = cal.min / (12.2) * 10^6,
+         TEE.equi.SEM = cal.min.SEM / 12.2 * 10^6 ) %>% 
   select(phenotype, contains("TEE"))
 
 d.EE # TEE-equivalent ATP value, nmol / min / animal
@@ -297,6 +297,15 @@ d.ATP.tidy3 <- d.ATP.tidy2 %>% left_join(d.ATP.produced.summary, by = "phenotype
   mutate(efficiency = prod.byCO2 / TEE.equi) 
 
 d.ATP.tidy3
+
+
+# compare the total ATP produced calculated by different means
+
+d.ATP.tidy3 %>% 
+  select(phenotype, TEE.equi, contains("prod."), -contains("frac"), -contains("SEM"))
+
+
+
 
 # check total ATP produced by 2 methods: CO2 based vs. O2 based methods
 d.ATP.tidy3 %>% select(phenotype, contains("prod"), -contains("frac")) %>% 
@@ -368,6 +377,8 @@ d.ATP.tidy4.WT %>%
         axis.text.y.right = element_text(margin = margin(r = 5, l = 5, unit = "pt")),
         axis.line.y.right = element_line(linetype = "dashed"),
         legend.position = "bottom") 
+
+
 
 
 ggsave(filename = "ATP cost_WT.pdf",
@@ -606,3 +617,61 @@ d.glc.glycolysis.TCA %>% func.plt.glycolysis.TCA()
 ggsave(filename = "glycolysis TCA_3pheno.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 5, width = 7)
+
+
+
+#-,>-#-,>-#-,>-#-,>-#-,>-#-,>-#-,>-#-,>-#-,>-#-,>-#-,>-
+# Calculate ATP Gibbs free energy 
+
+conc.ATP <- seq(from = 1, to = 10, 1) 
+conc.Pi <-  seq(from = 1, to = 10, 1) 
+conc.ADP <- seq(from = .1, to = 1, .1) 
+
+d.ATP.DG <- tibble(conc.ATP, conc.ADP, conc.Pi)
+
+DG.standard <- -31.5
+R = 8.314 / 1000 # KJ/mol/K
+K = 310 # Kelvin
+
+d.DG <- d.ATP.DG %>% 
+  # create all possible combinations
+  expand(conc.ATP, conc.ADP, conc.Pi) %>% 
+  mutate(DG.physio = DG.standard + R * K * log( conc.ADP/1000  *  conc.Pi/1000  / (conc.ATP /1000) ),
+         DG.physio = -DG.physio)
+
+d.DG
+
+
+d.DG %>% 
+  ggplot(aes(x = conc.ATP, y = DG.physio, color = conc.ADP)) +
+  geom_line(aes(group = conc.ADP)) + 
+  scale_color_distiller(palette = "Spectral", breaks = seq(0.1, 1, .2)) +
+  facet_wrap(~conc.Pi, nrow = 1) +
+  scale_x_continuous(breaks = seq(1, 11, 4)) +
+  
+  guides(color = guide_colorbar(barwidth = unit(300, "pt"),
+                                barheight = unit(5, "pt"))) +
+  
+  geom_point(data = tibble(
+    conc.ATP = 5, DG.physio = 51, conc.ADP = 5, conc.Pi = 5),
+    color = "black", shape = "diamond", size = 3) +
+  geom_hline(yintercept = 51, linetype = "dashed", linewidth = .5) +
+  scale_y_continuous(
+    name = "Energy (KJ/mol)\n",
+    sec.axis = sec_axis(trans = ~(. - 51)/(51)*100,
+                        labels = function(x){paste(x, "%")},
+                        name = "relative error"
+    )
+  ) +
+  labs(x = "ATP (mM)", 
+       color = "ADP (mM)    ") +
+  theme.myClassic +
+  theme(legend.position = "bottom",
+        panel.spacing.x = unit(10, "pt"),
+        legend.title = element_text(color = "black", face = "bold", size = 13),
+        axis.text.x = element_text(size = 12)) 
+
+
+ggsave(filename = "ATP Gibbs Free Energy.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 4, width = 10)

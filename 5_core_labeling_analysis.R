@@ -259,35 +259,53 @@ flx.plot_labeling_enrichment.which.Tracer.Blood =
 
 # visualize: labeling of selected metabolite in venous or arterial blood during infusion of selected tracer
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Glucose", mylabeled.compound = "Glucose",
-  plotBlood = "tail", enrichment_lower_bound = .5
+  my.infused.tracer = "Glucose", mylabeled.compound = "Lactate",
+  plotBlood = "art", enrichment_lower_bound = .7
 )
 
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "Acetate", mylabeled.compound = "Glucose",
+  plotBlood = "tail", enrichment_lower_bound = .85
+)
+
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "Glycerol", mylabeled.compound = "Lactate",
+  plotBlood = "tail", enrichment_lower_bound = .93
+)
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "Glycerol", mylabeled.compound = "Glucose",
+  plotBlood = "tail", enrichment_lower_bound = .85
+)
+
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "Lactate", mylabeled.compound = "Glucose",
+  plotBlood = "art", enrichment_lower_bound = .7
+)
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
   my.infused.tracer = "Lactate", mylabeled.compound = "Lactate",
-  plotBlood = "art", enrichment_lower_bound = .5
+  plotBlood = "art", enrichment_lower_bound = .7
+)
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "Glycerol", mylabeled.compound = "Glucose",
+  plotBlood = "tail", enrichment_lower_bound = .84
+)
+
+flx.plot_labeling_enrichment.which.Tracer.Blood(
+  my.infused.tracer = "Glutamine", mylabeled.compound = "Glucose",
+  plotBlood = "tail", enrichment_lower_bound = .95
 )
 
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "C16:0", mylabeled.compound = "C16:0",
-  plotBlood = "tail", enrichment_lower_bound = .5
+  my.infused.tracer = "Glutamine", mylabeled.compound = "Lactate",
+  plotBlood = "tail", enrichment_lower_bound = .95
 )
-
-
-flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "C18:1", mylabeled.compound = "C18:1",
-  plotBlood = "tail", enrichment_lower_bound = .5
-)
-
-
-flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "3-HB", mylabeled.compound = "3-HB",
-  plotBlood = "tail", enrichment_lower_bound = .5
-)
-
-
 
 # summarize and export averaged isotopomer distribution
 d.isotopomer <-  d.normalized.tidy %>% 
@@ -756,10 +774,17 @@ func.plt.Fcirc.Compound = function(yAxis = "Fcirc_animal") {
 
 
 plt.Fcirc.perGram_BW = func.plt.Fcirc.Compound(yAxis = "Fcirc_g.BW") 
+plt.Fcirc.perGram_BW
+
+ggsave(filename = "molecule per gBW Fcirc.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 5.5 * 1.1, width = 9 * 1.1)
+
 plt.Fcirc_animal = func.plt.Fcirc.Compound(yAxis = "Fcirc_animal") +
   labs(y = "nmol molecules / min /animal\n")
 
-plt.Fcirc_animal
+plt.Fcirc_animal 
+
 
 
 # add statistic test
@@ -950,6 +975,8 @@ d.Fcirc_standard.atom.summary = d.Fcirc_standard.atom.summary %>%
   group_by(phenotype) %>% 
   mutate(position.y.error_Fcic.g.BW.atom = func.cumulatedSum(Fcirc_g.BW.atom.mean),
          position.y.error_Fcic.animal.atom = func.cumulatedSum(Fcirc_animal.atom.mean))
+
+
 
 # plot 
 func.plt.Fcirc.atom.bar = function(yAxis){
@@ -1292,19 +1319,27 @@ r
 
 # - Generalized linear regression analysis
 d.Fcirc.BW <- d.Fcirc.standard.atom_art.or.tail %>% 
-  select(Compound, phenotype, infusion_mouseID, BW, Fcirc_animal) %>% 
+  select(Compound, phenotype, infusion_mouseID, infusion_round, BW, Fcirc_animal) %>% 
   filter(phenotype != "db/db") %>% 
   # arrange phenotype in order (WT as reference)
   mutate(phenotype = factor(phenotype, levels = ordered.phenotype)) %>% 
   arrange(phenotype) %>% 
   mutate(Compound = factor(Compound, levels = ordered.Compound))
 
+
+# remove rounds (during paper revision) designed to compare fluxes between HFD and ob/ob of matched body weight  
+# these rounds contain HFD with high body mass (50-70g) with 6-12 months on the high-fat diet
+# these matched body weight fluxes are otherwise displayed as bars stratified by body weight range 
+rounds.matched.BW <- c("cg", "da", "dc", "dd", "ci")
+
 plt.Fcirc.BW <- d.Fcirc.BW %>% 
-  # filter(Compound == "Glucose") %>% 
+  
+  filter(! infusion_round %in% rounds.matched.BW) %>%
+  
   ggplot(aes(x = BW, y = Fcirc_animal, color = phenotype, fill = phenotype)) +
   geom_point(size = 3, stroke = 1, alpha = .4) +
   facet_wrap(~Compound, scales = "free", nrow = 2) +
-  # geom_smooth(method = "lm", se = F, show.legend = F) +
+  geom_smooth(method = "lm", se = F, show.legend = F) +
   scale_color_manual(values = color.phenotype) +
   scale_fill_manual(values = color.phenotype) +
   # convert nmol to µmol / min / animal
@@ -1315,33 +1350,49 @@ plt.Fcirc.BW <- d.Fcirc.BW %>%
         axis.text = element_text(size = 16),
         strip.text = element_text(size = 15))  +
   ggalt::geom_encircle(s_shape = 1, expand = 0, alpha = .15, show.legend = F)
+
 plt.Fcirc.BW
 
+ggsave(filename = "Fcirc vs body weight.pdf", 
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       device = "pdf", height = 6, width = 12)
 
 
-# average value
-d.Fcirc.BW %>% 
-  filter(Compound == "Glucose") %>% 
-  group_by(phenotype) %>% 
-  summarise(across(c(BW, Fcirc_animal), 
-                   .fns = list(mean = ~mean(.x), sd = ~sd(.x)))) %>% 
-  ggplot(aes(x = BW_mean, y = Fcirc_animal_mean, color = phenotype)) +
-  geom_point(size = 3) +
-  geom_errorbar(aes(ymin = Fcirc_animal_mean - Fcirc_animal_sd,
-                    ymax = Fcirc_animal_mean + Fcirc_animal_sd)) +
-  geom_errorbar(aes(xmin = BW_mean - BW_sd,
-                    xmax = BW_mean + BW_sd)) +
-  scale_color_manual(values = color.phenotype) +
-  # convert nmol to µmol / min / animal
-  scale_y_continuous(labels = function(x){x/1000}) +
-  labs(y = "µmol molecules / min") +
-  theme(legend.position = "bottom",
-        panel.spacing = unit(7, units = "pt"),
-        axis.text = element_text(size = 16),
-        strip.text = element_text(size = 15)) +
-  labs(x = "Body mass (g)")
+# plot body-weight matched HFD and ob/ob
+d.Fcirc.BW.matched <- d.Fcirc.BW %>% 
+  filter(phenotype %in% c("ob/ob", "HFD") & Compound %in% c("Glucose", "C16:0")) %>%
+  filter(BW <= 60 & BW >= 40) %>% 
+  mutate(BW.range = ifelse(BW <= 50, "40-50", "50-60")) 
+  
+d.Fcirc.BW.matched %>% 
+  ggplot(aes(x = BW.range, y = Fcirc_animal, fill = phenotype)) +
+  stat_summary(geom = "bar", fun = "mean", position = "dodge", 
+               alpha = .5, color = "black", width = .7) +
+  stat_summary(
+    geom = "errorbar", fun.data = "mean_sdl", fun.args = list(mult = 1), 
+    position = position_dodge(.7), width = .5 ) +
+  geom_quasirandom(dodge.width = .7, width = .1, show.legend = F) +
+  scale_y_continuous(labels = function(x) x/ 1000,
+                     expand = expansion(mult = c(0, .1)), 
+                     n.breaks = 6) +
+  facet_wrap(~Compound, scales = "free") +
+  labs(x = "body weight (g)", y = "µmol molecules / min /animal\n") + 
+  scale_fill_manual(values = color.phenotype) +
+  scale_x_discrete(expand = expansion(mult = c(.6, .6))) + 
+  theme.myClassic 
 
+ggsave(filename = "Fcirc matched body weight.pdf", 
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       device = "pdf", height = 3, width = 7)
 
+# calculate stats
+d.Fcirc.BW.matched %>%
+  nest(-c(Compound, BW.range)) %>% 
+  mutate(model = map(data, ~t.test(Fcirc_animal ~ phenotype, data = .x, ))) %>% 
+  mutate(glance = map(model, broom::glance)) %>%  
+  unnest(glance) %>% 
+  mutate(stars = map_chr(p.value, ~func.generate_stars(.x)), .before = 3)
+  
 
 
 # Generalized linear model, with interaction term of BW and phenotype
@@ -1565,7 +1616,11 @@ ggsave(filename = "serum metabolomics_Fcirc.pdf",
 
 
 
-
+# remove infusion rounds containing heavy HFD mice (> 50g; 8-12 months on diet) with matched body weight as ob/ob
+# these heavy HFD mice do NOT affect the whole-body level flux; 
+# For flux normalized by body weight, we use ~ 45 g HFD as the typical body mass (3-4 months on fat diet)
+d.normalized.tidy <- d.normalized.tidy %>%  filter(! infusion_round %in% rounds.matched.BW) 
+  
 
 save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/5_core_labeling_analysis.RData")
 

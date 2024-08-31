@@ -1169,7 +1169,7 @@ d.energyExpenditure <- d.infusion.stable.summary1 %>%
          CO2.L.min = CO2.umol.min / 10^6 * 22.4) %>% 
   # energy expenditure using Weir's formula
   mutate(kcal.h = (3.941 * O2.L.min + 1.106 * CO2.L.min) * 1440 / 24,
-         cal.min = kcal.h / 60 * 1000 )
+         cal.min = kcal.h / 60 * 1000)
 
 plt.calorie <- d.energyExpenditure %>% 
   func.plt.basicsPhysiology(whichY = "cal.min", mytitle = "energy expenditure") +

@@ -90,80 +90,12 @@ x2 <- x %>% select(-nmol.min.animal.mean) %>%
 # carbon atom flux of esterification
 d.ester <- left_join(x1, x2)
 
-# combine with glycerol to sink flux
-d.ester2 <- d.flx.CO2.nonOx.sink %>% 
-  filter(destiny == "non-Ox sink" & Compounds == "Glycerol") %>% 
-  ungroup() %>% select(phenotype, nmol.min.animal.mean, nmol.min.animal.SEM) %>% 
-  # convert to molecules basis
-  mutate(nmol.min.animal.mean = nmol.min.animal.mean / 3,
-         nmol.min.animal.SEM  = nmol.min.animal.SEM / 3) %>% 
-  # S.glyL: carbon atoms sink flux of glycerol
-  rename(S.gly = nmol.min.animal.mean, S.gly.SEM = nmol.min.animal.SEM) %>% 
-  right_join(d.ester)
-
-# combine with glucose to sink flux
-d.ester3 <- d.flx.CO2.nonOx.sink %>% 
-  filter(destiny == "non-Ox sink" & Compounds == "Glucose") %>% 
-  ungroup() %>% select(phenotype, nmol.min.animal.mean, nmol.min.animal.SEM) %>% 
-  # convert to molecules basis
-  mutate(nmol.min.animal.mean = nmol.min.animal.mean / 6,
-         nmol.min.animal.SEM  = nmol.min.animal.SEM / 6) %>% 
-  rename(S.glu = nmol.min.animal.mean, S.glu.SEM = nmol.min.animal.SEM) %>% 
-  left_join(d.ester2) %>% 
-  # reorder columns
-  select(phenotype, !contains("SEM"), contains("SEM"))
-
-# counting ATP cost 
-d.ester4 <- d.ester3 %>% 
-  # needed glycerol molecules for ER 
-  mutate(ER.gly.need = ER / 3,
-         ER.gly.needed.SEM = ER.SEM / 3) %>% 
-  mutate(
-    # Sink flux of glycerol to TAG via lipoprotein pathway, cost 11 ATP / TAG
-    ATP.ER.lipop = S.gly * 11,
-    ATP.ER.lipop.SEM = S.gly.SEM * 11,
-    
-    # needed glycerol molecules for ER only from lipolysis G3P pathway
-    ATP.ER.G3P = (ER.gly.need - S.gly) * 8,
-    ATP.ER.G3P.SEM = sqrt(ER.gly.needed.SEM^2 + S.gly.SEM^2) * 8,
-    
-    ATP.ER.total = ATP.ER.lipop + ATP.ER.G3P,
-    ATP.ER.total.SEM = sqrt(ATP.ER.lipop.SEM^2 +  ATP.ER.G3P.SEM^2)
-  ) %>% 
-  
-  # part of ER, and all IR gets its glycerol from glucose via glycolysis G3P pathway
-  # mutate(
-  #   # glycerol molecule flux to TAG, with glycerol from glycolysis and G3P pathway
-  #   gly.from.glu = (ER + IR)/3 - S.gly, 
-  #   # glucose molecules that supports to generate glycerol backbone in TAG
-  #   glu.to.TAG = gly.from.glu/2,
-  #   # such TAG sink flux of glucose relative to total glucose sink flux
-  #   frac.glu.TAG =  glu.to.TAG / S.glu) %>% 
-  # # ATP cost by the glycolysis G3P pathway
-  # mutate(ATP.G3Ppath = gly.from.glu * 8) %>% 
-
-# Total ATP cost for ER reesterification
-mutate(ATP.TAG.resynthesis = ATP.ER.total,
-       ATP.TAG.resynthesis.SEM = ATP.ER.total.SEM)
-
-d.ester4
-# 74~92% of glucose sink flux is directed to TAG glycerol...
-
-d.ATP.TAG <- d.ester4 %>% 
-  select(phenotype, ATP.TAG.resynthesis, ATP.TAG.resynthesis.SEM)
+# calculate ATP cost for extracellular reesterification; each TAG resynthesis consumes 9 ATP
+d.ATP.TAG <- d.ester %>% 
+  mutate(ATP.TAG.resynthesis = ER / 3 * 9,
+         ATP.TAG.resynthesis.SEM = ER.SEM / 3 * 9, .keep = "none")
 
 
-
-# nmol ATP consumed / min / animal
-d.ATP.TAG
-# ATP fold change
-22952/13547
-
-# ER fold change
-99.2/43.2
-
-# ER + IR fold change
-(28.4+99.2)/(26.4+43.2)
 
 #- --- Protein turnover ---<>----<>----<>----<>----<>----<>-
 # average protein oxidized or resynthesized, in mg
@@ -675,3 +607,7 @@ d.DG %>%
 ggsave(filename = "ATP Gibbs Free Energy.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 4, width = 10)
+
+
+save.image(file ="/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/9_core_ATP_estimate.RData")
+

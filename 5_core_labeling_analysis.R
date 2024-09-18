@@ -259,53 +259,25 @@ flx.plot_labeling_enrichment.which.Tracer.Blood =
 
 # visualize: labeling of selected metabolite in venous or arterial blood during infusion of selected tracer
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Glucose", mylabeled.compound = "Lactate",
-  plotBlood = "art", enrichment_lower_bound = .7
+  my.infused.tracer = "Glucose", mylabeled.compound = "Glucose",
+  plotBlood = "tail", enrichment_lower_bound = .5
 )
 
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Acetate", mylabeled.compound = "Glucose",
+  my.infused.tracer = "C18:2", mylabeled.compound = "3-HB",
   plotBlood = "tail", enrichment_lower_bound = .85
 )
 
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Glycerol", mylabeled.compound = "Lactate",
-  plotBlood = "tail", enrichment_lower_bound = .93
-)
-
-flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Glycerol", mylabeled.compound = "Glucose",
-  plotBlood = "tail", enrichment_lower_bound = .85
+  my.infused.tracer = "3-HB", mylabeled.compound = "3-HB",
+  plotBlood = "tail", enrichment_lower_bound = .6
 )
 
 
-flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Lactate", mylabeled.compound = "Glucose",
-  plotBlood = "art", enrichment_lower_bound = .7
-)
-
-flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Lactate", mylabeled.compound = "Lactate",
-  plotBlood = "art", enrichment_lower_bound = .7
-)
-
-flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Glycerol", mylabeled.compound = "Glucose",
-  plotBlood = "tail", enrichment_lower_bound = .84
-)
-
-flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Glutamine", mylabeled.compound = "Glucose",
-  plotBlood = "tail", enrichment_lower_bound = .95
-)
 
 
-flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Glutamine", mylabeled.compound = "Lactate",
-  plotBlood = "tail", enrichment_lower_bound = .95
-)
 
 # summarize and export averaged isotopomer distribution
 d.isotopomer <-  d.normalized.tidy %>% 
@@ -332,7 +304,6 @@ d.isotopomer.spread %>%
     showNA = F,
     file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/isotopologues.xlsx"
   )
-
 
 
 
@@ -446,7 +417,7 @@ d.art.vs.tail.ratio.summary.output =  d.art.vs.tail.ratio.summary %>%
 
 
 # read manually organized molecular A-V ratio
-d.art.vs.tail.ratio.summary = read_excel("/Users/boyuan/Desktop/Harvard/Research/db db mice/Infusion data/A-V ratio.xlsx", sheet = "Molecular ratio") %>% 
+d.art.vs.tail.ratio.summary = read_excel("/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/A-V ratio.xlsx", sheet = "Molecular ratio") %>% 
   gather(-phenotype, key = Compound, value = correctFactor.mean)  
 
 
@@ -476,7 +447,7 @@ d.Fcirc = d.Fcirc %>%
 # later only artery blood if available is shown, or use corrected tail blood if artery blood is not available
 d.Fcirc = d.Fcirc %>%
   mutate(Fcirc_animal = infusion_uL_perMin * tracer_conc_mM * (1-enrich.corrected) / enrich.corrected,
-         Fcirc_g.BW = Fcirc_animal / BW)
+         Fcirc_g.BW = Fcirc_animal / BW) 
 
 
 
@@ -1363,7 +1334,7 @@ d.Fcirc.BW.matched <- d.Fcirc.BW %>%
   filter(phenotype %in% c("ob/ob", "HFD") & Compound %in% c("Glucose", "C16:0")) %>%
   filter(BW <= 60 & BW >= 40) %>% 
   mutate(BW.range = ifelse(BW <= 50, "40-50", "50-60")) 
-  
+
 d.Fcirc.BW.matched %>% 
   ggplot(aes(x = BW.range, y = Fcirc_animal, fill = phenotype)) +
   stat_summary(geom = "bar", fun = "mean", position = "dodge", 
@@ -1392,7 +1363,7 @@ d.Fcirc.BW.matched %>%
   mutate(glance = map(model, broom::glance)) %>%  
   unnest(glance) %>% 
   mutate(stars = map_chr(p.value, ~func.generate_stars(.x)), .before = 3)
-  
+
 
 
 # Generalized linear model, with interaction term of BW and phenotype
@@ -1620,7 +1591,7 @@ ggsave(filename = "serum metabolomics_Fcirc.pdf",
 # these heavy HFD mice do NOT affect the whole-body level flux; 
 # For flux normalized by body weight, we use ~ 45 g HFD as the typical body mass (3-4 months on fat diet)
 d.normalized.tidy <- d.normalized.tidy %>%  filter(! infusion_round %in% rounds.matched.BW) 
-  
+
 
 save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/5_core_labeling_analysis.RData")
 

@@ -1,3 +1,5 @@
+library(tidyverse)
+
 n.nutrient <- 20 # compounds noted as a big letters
 nutrientNames <- LETTERS[1:n.nutrient]
 
@@ -17,6 +19,7 @@ m.L
 
 rownames(m.L) <- nutrientNames
 colnames(m.L) <- nutrientNames
+
 
 
 # in each row, let the diagonal value (same tracer-tracee pair) be the max;

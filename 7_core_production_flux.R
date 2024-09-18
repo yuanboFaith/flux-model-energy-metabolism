@@ -1124,6 +1124,7 @@ func.mirror <- function(
       name = NULL) +
     scale_y_continuous(name = paste("nmol C / min /", norm.basis, "\n"),
                        n.breaks = 7,
+                       labels = function(x)abs(x),
                        expand = expansion(mult = c(0.05, 0.05))) +
     
     # as the consumption and production calculated values are not perfectly the same
@@ -1152,7 +1153,7 @@ func.mirror(y = "nmol.min.animal.mean",  # y axis
             norm.basis = "animal", # the basis of normalization
             myEdge = 1) +
   # update y axis: convert nmol to µmol
-  scale_y_continuous(labels = ~ .x / 1000, name = "µmol C / min / animal")
+  scale_y_continuous(labels = ~ abs(.x) / 1000, name = "µmol C / min / animal")
 
 ggsave(filename = paste0("mirror ", "animal", ".pdf"), 
        height = 7, width = 11,
@@ -1565,5 +1566,13 @@ ggsave(
 
 # save project
 save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/7_core_production_flux.RData")
+
+
+# export key data to calculate interconversion flux as a template for labmates' use
+save(d.enrich.atom.summary, 
+     d.normalized.tidy,
+     file = "/Users/boyuan/Desktop/Harvard/Research/db db mice/Infusion data/data_for_flux_calculate_template.RData")
+
+
 
 

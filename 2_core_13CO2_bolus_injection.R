@@ -298,7 +298,6 @@ for (cage.i in d.time.h.zero$cage %>% unique()) {
 
 
 
-
 # Plot kinetic curves; Note the injection dose was different!
 plt.kinetics.13C.flx.tailVein = d.all.treated %>% 
   filter(inj == "tail.vein_anesthesia") %>%

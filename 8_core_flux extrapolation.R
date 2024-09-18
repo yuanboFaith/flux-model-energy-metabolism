@@ -1108,3 +1108,8 @@ d.C3.all %>%
 ggsave(filename = "glycerol recycle.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 3*1.1, width = 6*1.1)
+
+
+save.image(file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/8_core_flux_extrapolation.RData")
+
+

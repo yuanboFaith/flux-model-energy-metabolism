@@ -165,7 +165,7 @@ ggsave(filename = "13CO2 recovery_infusion_3phenotypes.pdf",
 plt.kinetics.infusion.expCurve.modeled_WT <- 
   (func.plot.infusion.kinetics.modeling(
     mydata = d.infusion.expCurve %>% 
-      filter(phenotype == "WT" & tracer != "Acetate")
+      filter(phenotype == "WT")
   ))[[1]]
 
 plt.kinetics.infusion.expCurve.modeled_WT +
@@ -390,8 +390,6 @@ k <- d.recovery.infuse.bolus %>%
 
 
 k %>% 
-  filter(!(recovery > .8 & tracer == "Glucose")) %>% 
-  # filter(tracer != "Acetate") %>% 
   ggplot(aes(x = tracer, y = recovery, label = recovery)) +
   stat_summary(geom = "bar", fun = mean, alpha = .3, 
                color = "black", fill = "coral", width = .8) +
@@ -597,13 +595,13 @@ plt.recovery.bolus.vs.infusion
 d.fox.infuse.bolus <- d.recovery.infuse.bolus %>% 
   mutate(fox = recovery / recovery.bicarbonate)
 
-f <- d.fox.infuse.bolus %>% 
+f.clean <- d.fox.infuse.bolus %>% 
   filter(phenotype == "WT") %>% 
   filter(tracer != "Bicarbonate") %>% 
   filter(! (tracer == "Glycerol" & inj == "bolus inj.")) %>% 
   mutate(tracer = fct_reorder(tracer, fox, .fun = mean, .desc = T, .na_rm = T))
 
-f %>% 
+f.clean %>% 
   ggplot(aes(x = tracer, y = fox, label = recovery)) +
   stat_summary(geom = "bar", fun = mean, alpha = .3, 
                color = "black", fill = "coral", width = .8) +
@@ -617,7 +615,7 @@ f %>%
   geom_quasirandom(dodge.width = dg, show.legend = F,
                    size = 1.5, shape = 21, alpha = 1, fill = "grey40") +
   # text labels  
-  geom_text(data = f %>% 
+  geom_text(data = f.clean %>% 
               group_by(tracer) %>% summarise(fox.mean = mean(fox)),
             aes(x = tracer, 
                 y = fox.mean + .2, 
@@ -638,7 +636,6 @@ f %>%
 ggsave(filename = "fox_mean_WT.pdf", 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        device = "pdf", height = 4.1, width = 7.2)
-
 
 
 # 1) MERGE the data from the bolus and infusion methods
@@ -695,7 +692,7 @@ plt.fox.3phenotypes
 
 ggsave(filename = "13CO2_fox_bolus_infuse_3phenotypes.pdf", 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       device = "pdf", height = 2.5, width = 12)
+       device = "pdf", height = 2.3, width = 14)
 
 
 
@@ -771,7 +768,7 @@ plt.fox.3phenotypes.stars
 
 ggsave(filename = "13CO2_fox_bolus_infuse_3phenotypes.pdf", 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 3.7, width = 12)
+       height = 2.5, width = 12)
 
 
 # style II
@@ -1263,9 +1260,10 @@ d.13C.info <- left_join(d.inj.info, d.inf.info) %>% as.data.frame()
 
 # BODY COMPOSITION
 
-# dataset of body composition by MRI
+# dataset o %>%  body composition by MRI
 d.bodyComposition <- read_excel(
-  "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/body composition.xlsx") %>% 
+  "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/body composition.xlsx",
+  range = "A14:C28") %>% 
   mutate(phenotype = factor(phenotype, levels = ordered.phenotype))
 
 
@@ -1347,10 +1345,6 @@ plot_grid(plt.fat.lean.labeled + theme(legend.position = "bottom"),
           plt.fat.lean.frac.labeled + theme(legend.position = "bottom"))
 
 
-# add labels
-
-
-
 
 
 # export the data
@@ -1359,7 +1353,11 @@ save(d.energyExpenditure, func.plt.basicsPhysiology, d.13C.info, d.infusion.expC
      # body composition
      d.bodyComposition.summary.tidy, 
      d.bodyComposition.tidy,
-     file = "3_core_13CO2_infusion_physiology_basics.RData")
+     
+     # figure data exported to Source Data
+     f.clean, A, d.insulin, d.BW2, d.glycemia, d.fox.infuse.bolus.subset, d.14C, 
+     
+     file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/3_core_13CO2_infusion_physiology_basics.RData")
 
 
 

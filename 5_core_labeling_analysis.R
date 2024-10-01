@@ -271,10 +271,9 @@ flx.plot_labeling_enrichment.which.Tracer.Blood(
 
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "3-HB", mylabeled.compound = "3-HB",
+  my.infused.tracer = "C16:0", mylabeled.compound = "C16:0",
   plotBlood = "tail", enrichment_lower_bound = .6
 )
-
 
 
 
@@ -823,7 +822,7 @@ plt.Fcirc_animal +
 
 ggsave(filename = "molecule Fcirc.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 5.5 * 1.1, width = 9 * 1.1)
+       height = 5, width = 11)
 
 # plt.Fcirc_animal + theme(panel.spacing.y = unit(20, "pt"))
 
@@ -1331,17 +1330,21 @@ ggsave(filename = "Fcirc vs body weight.pdf",
 
 # plot body-weight matched HFD and ob/ob
 d.Fcirc.BW.matched <- d.Fcirc.BW %>% 
-  filter(phenotype %in% c("ob/ob", "HFD") & Compound %in% c("Glucose", "C16:0")) %>%
-  filter(BW <= 60 & BW >= 40) %>% 
-  mutate(BW.range = ifelse(BW <= 50, "40-50", "50-60")) 
+  # filter(phenotype %in% c("ob/ob", "HFD") & Compound %in% c("Glucose", "C16:0")) %>%
+  filter(Compound %in% c("Glucose", "C16:0")) %>%
+  filter(BW <= 60) %>% 
+  mutate(BW.range = ifelse(BW <= 50, "40-50",  "50-60"),
+         BW.range = ifelse(phenotype == "WT", "25-33", BW.range)) 
 
 d.Fcirc.BW.matched %>% 
   ggplot(aes(x = BW.range, y = Fcirc_animal, fill = phenotype)) +
-  stat_summary(geom = "bar", fun = "mean", position = "dodge", 
+  stat_summary(geom = "bar", fun = "mean", 
+               position = position_dodge(preserve = "total"), 
                alpha = .5, color = "black", width = .7) +
   stat_summary(
     geom = "errorbar", fun.data = "mean_sdl", fun.args = list(mult = 1), 
-    position = position_dodge(.7), width = .5 ) +
+    position = position_dodge(.7, preserve = "total"), 
+    width = .5 ) +
   geom_quasirandom(dodge.width = .7, width = .1, show.legend = F) +
   scale_y_continuous(labels = function(x) x/ 1000,
                      expand = expansion(mult = c(0, .1)), 
@@ -1349,7 +1352,7 @@ d.Fcirc.BW.matched %>%
   facet_wrap(~Compound, scales = "free") +
   labs(x = "body weight (g)", y = "µmol molecules / min /animal\n") + 
   scale_fill_manual(values = color.phenotype) +
-  scale_x_discrete(expand = expansion(mult = c(.6, .6))) + 
+  scale_x_discrete(expand = expansion(mult = c(.3, .3))) + 
   theme.myClassic 
 
 ggsave(filename = "Fcirc matched body weight.pdf", 
@@ -1358,6 +1361,7 @@ ggsave(filename = "Fcirc matched body weight.pdf",
 
 # calculate stats
 d.Fcirc.BW.matched %>%
+  filter(phenotype!= "WT") %>% 
   nest(-c(Compound, BW.range)) %>% 
   mutate(model = map(data, ~t.test(Fcirc_animal ~ phenotype, data = .x, ))) %>% 
   mutate(glance = map(model, broom::glance)) %>%  

@@ -398,6 +398,14 @@ d.Fcirc.BW.matched %>%
   as.data.frame() %>% ff("S7C")  
 
 
+# S7D
+d.westernblot <- read_excel(
+  "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/hyperinsulinemia.xlsx",
+  sheet = "immunoblot")  
+
+d.westernblot %>% as.data.frame() %>% ff("S7D")  
+
+
 # S8D
 dwnC %>% 
   select(constraint, targetCompound, sources, nmol.min.g.mean, nmol.min.g.SEM) %>% 

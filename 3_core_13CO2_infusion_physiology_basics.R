@@ -5,6 +5,7 @@ library(rebus)
 library(viridis)
 library(lubridate)
 library(readxl)
+library(rstatix)
 library(purrr)
 library(broom)
 library(RColorBrewer)
@@ -956,8 +957,111 @@ d.infusion.stable.summary1 <- d.infusion.stable.2 %>%
 #   summarise(CO2 = mean(CO2.umol.min))
 
 
+
+
+# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-
+
+# BODY COMPOSITION
+
+# dataset o %>%  body composition by MRI
+d.bodyComposition <- read_excel(
+  "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/body composition.xlsx",
+  range = "A14:C28") %>% 
+  mutate(phenotype = factor(phenotype, levels = ordered.phenotype))
+
+
+# mean and SD of mass of fat and lean tissues
+d.bodyComposition.tidy <- d.bodyComposition %>%  
+  group_by(phenotype) %>% 
+  summarise(across(c(fat, lean),
+                   .fn = list(mean = ~mean(.x), sd = ~sd(.x)))
+  ) %>% 
+  pivot_longer(-phenotype, names_sep = "_",
+               names_to = c("part", ".value")) %>% 
+  # error bar position
+  group_by(phenotype) %>% 
+  arrange(desc(part)) %>% 
+  mutate(y.error = cumsum(mean))
+
+# plot
+plt.fat.lean <- d.bodyComposition.tidy %>% 
+  ggplot(aes(x = phenotype, y = mean, alpha = part, fill = phenotype)) +
+  geom_col(color = "black") +
+  geom_errorbar(aes(ymin = y.error - sd, ymax = y.error),
+                width = .2, alpha = 1) +
+  theme.myClassic +
+  scale_y_continuous(expand = expansion(mult = 0),
+                     breaks = seq(0, 70, 10)) +
+  # scale_fill_manual(values = c("fat" = "snow2", "lean" = "snow4")) +
+  labs(y = "mass (g)", x = NULL, title = "fat / lean") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 19),
+        axis.title.y.left = element_text(margin = margin(r = 8, unit = "pt")),
+        axis.title.y.right = element_text(margin = margin(l = 8, unit = "pt")),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 17),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom") +
+  scale_x_discrete(expand = expansion(add = 1)) +
+  scale_fill_manual(values = color.phenotype) +
+  scale_alpha_manual(values = c(.05, .8)) 
+
+plt.fat.lean
+
+# add labels
+plt.fat.lean.labeled <- plt.fat.lean + geom_text(
+  aes(label = round(mean, 1)), 
+  position = position_stack(vjust = .5), color = "black", alpha = 1) 
+plt.fat.lean.labeled
+
+
+# calculate fraction of fat and lean - ------------------------
+d.bodyComposition.summary <- d.bodyComposition %>% 
+  mutate(sum = fat + lean,
+         fat.frac = fat/sum,
+         lean.frac = lean / sum) %>% 
+  group_by(phenotype) %>% 
+  summarise(across(contains("frac"), 
+                   .fn = list(
+                     mean = ~ mean(.x, na.rm = T), # calcualte the mean
+                     sd = ~ sd(.x, na.rm = T))))  # calculate standard deviation
+# tidy up
+d.bodyComposition.summary.tidy <- d.bodyComposition.summary %>% 
+  pivot_longer(-phenotype, names_to = c("part", ".value"), names_sep = "_") %>% 
+  group_by(phenotype) %>% 
+  arrange(desc(part)) %>% 
+  mutate(y.error = cumsum(mean)) %>% 
+  mutate(part = str_remove(part, ".frac"))
+
+# plot of distribution fraction
+plt.fat.lean.frac <- d.bodyComposition.summary.tidy %>% 
+  ggplot(aes(x = phenotype, y = mean, fill = part)) +
+  geom_col(color = "black") +
+  geom_errorbar(aes(ymin = y.error - sd, ymax = y.error),
+                width = .2) +
+  theme.myClassic +
+  scale_y_continuous(expand = expansion(mult = 0),
+                     breaks = seq(0, 1, .2)) +
+  scale_fill_manual(values = c("fat" = "snow2", "lean" = "snow4")) +
+  labs( y = "fraction")
+
+plt.fat.lean.frac
+
+# add label
+plt.fat.lean.frac.labeled <- plt.fat.lean.frac + geom_text(
+  aes(label = round(mean*100, 1)), 
+  position = position_stack(vjust = .5), color = "cyan") 
+
+plt.fat.lean.frac.labeled
+
+# plot all
+plot_grid(plt.fat.lean.labeled + theme(legend.position = "bottom"), 
+          plt.fat.lean.frac.labeled + theme(legend.position = "bottom"))
+
+
+
 # significant analysis
-library(rstatix)
+
 
 # define function making bar plots
 func.plt.basicsPhysiology <- function(
@@ -1188,17 +1292,20 @@ plt.calorie
 # plot all together
 b <- ggplot() + theme_void()
 
-p1 <- plot_grid(plt.BW , b, 
+p1 <- plot_grid(plt.BW, b, 
+                plt.fat.lean + 
+                  coord_cartesian(ylim = c(0, 105)) +
+                  scale_y_continuous(breaks = seq(0, 75, 15), expand = expansion(mult = c(0, 0))), b, 
                 plt.glycemia , 
                 b,  plt.insulin, 
-                b, plt.CO2, 
-                nrow = 1, rel_widths = c(.85, .1, 1, .1, .85, .1,  1))
+                
+                nrow = 1, rel_widths = c(.85, .1, .85, .1, 1, .1, .85))
 p1
-p2 <- plot_grid(b, plt.O2 , b, plt.RER , b, plt.calorie, b,
+p2 <- plot_grid(plt.CO2, b, plt.O2 , b, plt.RER , b, plt.calorie,
                 nrow = 1, 
-                rel_widths = c(.3, 1, .1,
+                rel_widths = c(1, .1, 1, .1, 
                                .85, .1, 
-                               1, .3))
+                               1))
 
 p2
 plot_grid(p1, p2, nrow = 2, align = "v")
@@ -1216,11 +1323,19 @@ d.energyExpenditure.selected <- d.energyExpenditure %>% ungroup() %>%
 
 # plot
 d.energyExpenditure.selected %>%
-  ggplot(aes(BW, CO2.L.min, color = phenotype)) + 
-  geom_point(size = 3, alpha = .5) +
-  geom_smooth(method = "lm", se = F) +
+  ggplot(aes(BW, cal.min, color = phenotype, fill = phenotype)) + 
+  geom_point(size = 5, alpha = .5) +
+  geom_smooth(method = "lm", se = T, alpha = .2, show.legend = F) +
   theme.myClassic +
-  scale_color_manual(values = color.phenotype)
+  scale_color_manual(values = color.phenotype) +  # +
+  scale_fill_manual(values = color.phenotype) +
+  scale_x_continuous(breaks = seq(30, 80, 10), name = "body mass (g)") +
+  labs(y = "energy expenditure (cal / min)")
+  # stat_ellipse()
+
+lm(d.energyExpenditure.selected %>% filter(phenotype == "ob/ob"), formula = cal.min ~ BW) %>% summary()
+lm(d.energyExpenditure.selected %>% filter(phenotype == "HFD"), formula = cal.min ~ BW) %>% summary()
+lm(d.energyExpenditure.selected %>% filter(phenotype == "WT"), formula = cal.min ~ BW) %>% summary()
 
 ggsave(filename = "BW_energy_expenditure_ANCOVA.pdf", 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
@@ -1254,95 +1369,6 @@ d.13C.info <- left_join(d.inj.info, d.inf.info) %>% as.data.frame()
 
 # output useful information
 
-
-
-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-# <>-
-
-# BODY COMPOSITION
-
-# dataset o %>%  body composition by MRI
-d.bodyComposition <- read_excel(
-  "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/body composition.xlsx",
-  range = "A14:C28") %>% 
-  mutate(phenotype = factor(phenotype, levels = ordered.phenotype))
-
-
-# mean and SD of mass of fat and lean tissues
-d.bodyComposition.tidy <- d.bodyComposition %>%  
-  group_by(phenotype) %>% 
-  summarise(across(c(fat, lean),
-                   .fn = list(mean = ~mean(.x), sd = ~sd(.x)))
-  ) %>% 
-  pivot_longer(-phenotype, names_sep = "_",
-               names_to = c("part", ".value")) %>% 
-  # error bar position
-  group_by(phenotype) %>% 
-  arrange(desc(part)) %>% 
-  mutate(y.error = cumsum(mean))
-
-# plot
-plt.fat.lean <- d.bodyComposition.tidy %>% 
-  ggplot(aes(x = phenotype, y = mean, fill = part)) +
-  geom_col(color = "black") +
-  geom_errorbar(aes(ymin = y.error - sd, ymax = y.error),
-                width = .2) +
-  theme.myClassic +
-  scale_y_continuous(expand = expansion(mult = 0),
-                     breaks = seq(0, 70, 10)) +
-  scale_fill_manual(values = c("fat" = "snow2", "lean" = "snow4")) +
-  labs(y = "mass (g)")
-
-plt.fat.lean
-
-# add labels
-plt.fat.lean.labeled <- plt.fat.lean + geom_text(
-  aes(label = round(mean, 1)), 
-  position = position_stack(vjust = .5), color = "cyan") 
-plt.fat.lean.labeled
-
-
-# calculate fraction of fat and lean - ------------------------
-d.bodyComposition.summary <- d.bodyComposition %>% 
-  mutate(sum = fat + lean,
-         fat.frac = fat/sum,
-         lean.frac = lean / sum) %>% 
-  group_by(phenotype) %>% 
-  summarise(across(contains("frac"), 
-                   .fn = list(
-                     mean = ~ mean(.x, na.rm = T), # calcualte the mean
-                     sd = ~ sd(.x, na.rm = T))))  # calculate standard deviation
-# tidy up
-d.bodyComposition.summary.tidy <- d.bodyComposition.summary %>% 
-  pivot_longer(-phenotype, names_to = c("part", ".value"), names_sep = "_") %>% 
-  group_by(phenotype) %>% 
-  arrange(desc(part)) %>% 
-  mutate(y.error = cumsum(mean)) %>% 
-  mutate(part = str_remove(part, ".frac"))
-
-# plot of distribution fraction
-plt.fat.lean.frac <- d.bodyComposition.summary.tidy %>% 
-  ggplot(aes(x = phenotype, y = mean, fill = part)) +
-  geom_col(color = "black") +
-  geom_errorbar(aes(ymin = y.error - sd, ymax = y.error),
-                width = .2) +
-  theme.myClassic +
-  scale_y_continuous(expand = expansion(mult = 0),
-                     breaks = seq(0, 1, .2)) +
-  scale_fill_manual(values = c("fat" = "snow2", "lean" = "snow4")) +
-  labs( y = "fraction")
-
-plt.fat.lean.frac
-
-# add label
-plt.fat.lean.frac.labeled <- plt.fat.lean.frac + geom_text(
-  aes(label = round(mean*100, 1)), 
-  position = position_stack(vjust = .5), color = "cyan") 
-
-plt.fat.lean.frac.labeled
-
-# plot all
-plot_grid(plt.fat.lean.labeled + theme(legend.position = "bottom"), 
-          plt.fat.lean.frac.labeled + theme(legend.position = "bottom"))
 
 
 

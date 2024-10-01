@@ -509,19 +509,19 @@ d.corrected.tidy.23 = func.combine_sample_ID(
   mutate(MS.run = "hyperinsulin")
 
 
-# sheet 24: gh, C16:0 infusion
-d24 = read_excel(path.labeling, sheet = "gh")
-list.corrected.24 = d24 %>% 
-  natural_abundance_correction(resolution = 12000)
-
-d.normalized.tidy.24 = func.combine_sample_ID(
-  dataset.tidy = list.corrected.24$Normalized %>% 
-    gather(-c(Compound, C_Label), key = sample, value = enrichment) )
-
-d.corrected.tidy.24 = func.combine_sample_ID(
-  dataset = list.corrected.24$Corrected %>% 
-    gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
-  mutate(MS.run = "gh")
+# # sheet 24: gh, C16:0 infusion
+# d24 = read_excel(path.labeling, sheet = "gh")
+# list.corrected.24 = d24 %>% 
+#   natural_abundance_correction(resolution = 12000)
+# 
+# d.normalized.tidy.24 = func.combine_sample_ID(
+#   dataset.tidy = list.corrected.24$Normalized %>% 
+#     gather(-c(Compound, C_Label), key = sample, value = enrichment) )
+# 
+# d.corrected.tidy.24 = func.combine_sample_ID(
+#   dataset = list.corrected.24$Corrected %>% 
+#     gather(-c(Compound, C_Label), key = sample, value = intensity)) %>% 
+#   mutate(MS.run = "gh")
 
 
 # sheet 25: da and dd, 16:0 infusion 

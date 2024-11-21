@@ -986,16 +986,6 @@ d.production.consumption.mirror <-
   mutate(x.axis = str_remove(x.axis, or( "_production", "_consumption")),
          x.axis = factor(x.axis, levels = ordered.phenotype))
 
-# set the boundary (max values) of the plot
-d.edge <- d.production.consumption.mirror %>% 
-  filter(phenotype == "ob/ob") %>% 
-  mutate(side = ifelse(nmol.min.animal.mean > 0, "up", "down")) %>% 
-  group_by(side, about) %>% 
-  summarise(edge = sum(abs(nmol.min.animal.mean))) %>% 
-  group_by(about) %>% 
-  summarise(edge = max(edge))
-
-
 # # visualization 
 # # Per animal 
 # plt.production.consumption.mirror <-  
@@ -1049,19 +1039,25 @@ d.edge <- d.production.consumption.mirror %>%
 
 
 
-# normalized based on per body weight
-d.BW2 <- d.BW %>% group_by(phenotype) %>% summarise(BW = mean(BW.mean))
-# composition of fat percent of body weight
-d.composition <- tibble(
-  phenotype = c("WT", "HFD", "ob/ob", "db/db"),
-  fat.frac = c(0.17, 0.47, 0.51, .51))
-# lean and fat mass
-d.BW2 <- d.BW2 %>% left_join(d.composition) %>% 
-  mutate(fat = BW * fat.frac, lean = BW * (1-fat.frac)) %>% 
-  select(-fat.frac)
 
-d.BW2
+# # normalized based on per body weight
+# d.BW2 <- d.BW %>% group_by(phenotype) %>% summarise(BW = mean(BW.mean))
+# # composition of fat percent of body weight
+# d.composition <- tibble(
+#   phenotype = c("WT", "HFD", "ob/ob", "db/db"),
+#   fat.frac = c(0.17, 0.47, 0.51, .51))
+# # lean and fat mass
+# d.BW2 <- d.BW2 %>% left_join(d.composition) %>%
+#   mutate(fat = BW * fat.frac, lean = BW * (1-fat.frac)) %>%
+#   select(-fat.frac)
+# 
+# d.BW2
 
+d.BW2 <- d.bodyComposition.tidy %>% 
+  select(phenotype, part, mean) %>% 
+  pivot_wider(names_from = part, values_from = mean) %>% 
+  mutate(BW = lean + fat)
+  
 
 # calculate fluxes based on per g BW, per g fat mass, or per g of lean mass
 d.production.consumption.mirror.normalized <- d.production.consumption.mirror %>%
@@ -1082,6 +1078,16 @@ d.production.consumption.mirror.normalized <- d.production.consumption.mirror %>
     nmol.min.gLean.SEM = nmol.min.animal.SEM / lean,
     err.Y.gLean = err.Y.animal / lean
   )
+
+
+# set the boundary (max values) of the plot
+d.edge <- d.production.consumption.mirror.normalized %>% 
+  filter(phenotype == "ob/ob") %>% 
+  mutate(side = ifelse(nmol.min.animal.mean > 0, "up", "down")) %>% 
+  group_by(side, about) %>% 
+  summarise(edge = sum(abs(nmol.min.animal.mean))) %>% 
+  group_by(about) %>% 
+  summarise(edge = max(edge))
 
 
 func.mirror <- function(
@@ -1107,8 +1113,8 @@ func.mirror <- function(
       name = "source of production, \nor destiny of consumption",
       labels = c("non-Ox sink" = "Storage (recycle)",
                  "storage" = "Storage (release)")) +
-    theme_minimal(base_size = 14) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+    theme_minimal(base_size = 13) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 15),
           strip.background = element_blank(),
           strip.text = element_text(face = "bold", size = 14),
           axis.text = element_text(color = "black", size = 13),
@@ -1123,7 +1129,7 @@ func.mirror <- function(
       labels = function(x){str_replace(x, "WT", "control")},
       name = NULL) +
     scale_y_continuous(name = paste("nmol C / min /", norm.basis, "\n"),
-                       n.breaks = 7,
+                       breaks = pretty_breaks(n = 9),
                        labels = function(x)abs(x),
                        expand = expansion(mult = c(0.05, 0.05))) +
     
@@ -1153,7 +1159,8 @@ func.mirror(y = "nmol.min.animal.mean",  # y axis
             norm.basis = "animal", # the basis of normalization
             myEdge = 1) +
   # update y axis: convert nmol to µmol
-  scale_y_continuous(labels = ~ abs(.x) / 1000, name = "µmol C / min / animal")
+  scale_y_continuous(labels = ~ abs(.x) / 1000, name = "µmol C / min / animal",
+                     breaks = pretty_breaks(n = 9))
 
 ggsave(filename = paste0("mirror ", "animal", ".pdf"), 
        height = 7, width = 11,
@@ -1170,14 +1177,12 @@ func.mirror( y = "nmol.min.gBW",  # y axis
 
 
 
-
 # normalize by lean mass -------------------------------------------------
 func.mirror( y = "nmol.min.gLean",  # y axis
              err.Y = "err.Y.gLean", # accumulated y-axis position for error bars
              errorBar = "nmol.min.gLean.SEM", # the SEM for each conversion flux 
              norm.basis = "per g lean mass", # the basis of normalization
-             myEdge = 35, fig.width = 13)
-
+             myEdge = 35, fig.width = 13, fig.height = 9) 
 
 
 # normalize by fat mass

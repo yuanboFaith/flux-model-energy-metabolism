@@ -639,9 +639,10 @@ plt.CO2.total.WT
 # WT per g BW
 plt.CO2.total.WT.BW <- f.plt.WT.CO2(whichY = CO2.umol.min/ 29 ) +
   scale_y_continuous(
-    breaks = seq(0, 3, .3),
+    breaks = seq(0, 3, .5),
     expand = expansion(mult = c(0, .01)),
-    name = "CO2 umol / min /g BW") 
+    labels = function(x) x * 1000,
+    name = "CO2 nmol / min /g BW") 
 plt.CO2.total.WT.BW 
 
 

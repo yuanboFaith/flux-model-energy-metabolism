@@ -66,6 +66,9 @@ d.normalized.tidy = d.normalized.tidy %>% filter(C_Label > 0) %>%
          infusion_uL_perMin = infusion_uL_perMin_g.BW * BW) # update whole body infusion rate as well!
 
 
+d.normalized.tidy.reference <- d.normalized.tidy
+
+save(d.normalized.tidy, file = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/d_normalized_tidy.RData")
 
 # Plot infusion parameters
 # d.normalized.tidy %>%
@@ -259,22 +262,21 @@ flx.plot_labeling_enrichment.which.Tracer.Blood =
 
 # visualize: labeling of selected metabolite in venous or arterial blood during infusion of selected tracer
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "Glucose", mylabeled.compound = "Glucose",
-  plotBlood = "tail", enrichment_lower_bound = .5
+  my.infused.tracer = "Glucose", mylabeled.compound = "Glutamine",
+  plotBlood = "art", enrichment_lower_bound = .5
 )
 
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "C18:2", mylabeled.compound = "3-HB",
-  plotBlood = "tail", enrichment_lower_bound = .85
+  my.infused.tracer = "Glutamine", mylabeled.compound = "Glutamine",
+  plotBlood = "tail", enrichment_lower_bound = .68
 )
 
 
 flx.plot_labeling_enrichment.which.Tracer.Blood(
-  my.infused.tracer = "C16:0", mylabeled.compound = "C16:0",
+  my.infused.tracer = "Acetate", mylabeled.compound = "Glutamine",
   plotBlood = "tail", enrichment_lower_bound = .6
 )
-
 
 
 

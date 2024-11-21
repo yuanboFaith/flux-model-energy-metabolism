@@ -379,7 +379,7 @@ d.volcano %>%
   as.data.frame() %>% ff("S7A")  
 
 
-# S7B
+# S7D
 d.Fcirc.BW %>% 
   select(phenotype, infusion_mouseID,  Compound, Fcirc_animal, BW) %>% 
   rename(`mouse ID` = infusion_mouseID,
@@ -388,7 +388,7 @@ d.Fcirc.BW %>%
   arrange(phenotype, Compound) %>% 
   as.data.frame() %>% ff("S7B")  
 
-# S7C
+# S7E1
 d.Fcirc.BW.matched %>% 
   select(phenotype, Compound, infusion_mouseID, BW.range, Fcirc_animal) %>% 
   rename(`mouse ID` = infusion_mouseID,
@@ -398,7 +398,7 @@ d.Fcirc.BW.matched %>%
   as.data.frame() %>% ff("S7C")  
 
 
-# S7D
+# S7E2
 d.westernblot <- read_excel(
   "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/hyperinsulinemia.xlsx",
   sheet = "immunoblot")  
@@ -406,7 +406,7 @@ d.westernblot <- read_excel(
 d.westernblot %>% as.data.frame() %>% ff("S7D")  
 
 
-# S8D
+# S8B
 dwnC %>% 
   select(constraint, targetCompound, sources, nmol.min.g.mean, nmol.min.g.SEM) %>% 
   rename(nutrient = targetCompound,

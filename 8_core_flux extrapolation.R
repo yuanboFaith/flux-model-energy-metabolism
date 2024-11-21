@@ -420,9 +420,8 @@ plt.flx.CO2.nonOx.sink.animal.WT.2.theme.gBW <-
         position = "right", name = "nmol/min/animal",
         expand = expansion(mult = c(0, .1)),
         sec.axis = sec_axis(trans = ~./29, 
-                            name = "umol C atom / min / g",
-                            breaks = seq(0, 2400, 300),
-                            labels =  function(x){x/1000}
+                            name = "nmol C atom / min / g BW",
+                            breaks = seq(0, 2400, 500)
         )
       ) +
       coord_cartesian(ylim = c(0, 2200*30))
@@ -435,25 +434,25 @@ plt.category.OX.NOS.WT.theme.gBW <- f.removeRightYaxis(
       position = "right", name = "nmol/min/animal",
       expand = expansion(mult = c(0, .1)),
       sec.axis = sec_axis(trans = ~./29, 
-                          name = "umol C atom / min / g",
-                          breaks = seq(0, 2500, 300),
-                          labels =  function(x){x/1000}
+                          name = "nmol C atom / min / g BW",
+                          breaks = seq(0, 2500, 500)
       )
     ) + 
     coord_cartesian(ylim = c(0, 2200*30))
 )
 
 plot_grid(
-  plt.CO2.total.WT.BW.theme.gBW, ggg,
+  plt.CO2.total.WT.BW.theme.gBW, 
+  ggg,
   plt.flx.CO2.nonOx.sink.animal.WT.2.theme.gBW, ggg,
   plt.category.OX.NOS.WT.theme.gBW,
-  nrow = 1, rel_widths = c(.8, .1, 2, .1, 2)
+  nrow = 1, rel_widths = c(.8, .15, 2, .15, 2)
 )
 
 
 ggsave(filename = "OX NOS WT gBW.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 3.7, width = 11.5)
+       height = 3.7, width = 12)
 
 
 
@@ -471,9 +470,20 @@ plt.stacked.bars.OX.NOS.3pheno.ALL <- plot_grid(
     facet_wrap(~1, scales = "free_x") + 
     coord_cartesian(ylim = c(0, 140), clip = "off")+
     scale_y_continuous(breaks = seq(0, 140, 20),
-                       expand = expansion(mult = c(0, .08)))+
+                       expand = expansion(mult = c(0, .08)),
+                       name = "umol C/min/animal",
+                       position = "right",
+                       sec.axis = sec_axis(transform = ~ . / 28,
+                                           breaks = seq(0, 5, .5),
+                                           labels = function(x) x * 1000,
+                                           name = "nmol C / min / g lean mass\n"))+
     theme(axis.text.x = element_text(angle = 45),
-          axis.text = element_text(size = 15)), 
+          axis.text = element_text(size = 15),
+          # remove the right (original main y axis elements) on unit of umol/min/animal
+          axis.title.y.right = element_blank(),
+          axis.text.y.right = element_blank(),
+          axis.line.y.right = element_blank(),
+          axis.ticks.y.right = element_blank()), 
   #gap
   ggplot() + theme_void(),
   
@@ -482,11 +492,21 @@ plt.stacked.bars.OX.NOS.3pheno.ALL <- plot_grid(
     theme(# strip.text = element_blank(),
       axis.text.x = element_text(angle = 45, hjust = 1),
       plot.title = element_blank(),
-      axis.text = element_text(size = 15)) +
+      axis.text = element_text(size = 15),
+      # remove the rght (original. main y axis elements) on unit of umol/min/animal
+      axis.title.y.right = element_blank(),
+      axis.text.y.right = element_blank(),
+      axis.line.y.right = element_blank(),
+      axis.ticks.y.right = element_blank()) +
     scale_y_continuous(limits = c(0, 100000),
                        breaks = seq(0, 140000, 20000),
                        labels = function(x){x/1000},
-                       expand = expansion(mult = c(0, .08))) +
+                       expand = expansion(mult = c(0, .08)),
+                       name = "umol C/min/animal",
+                       position = "right",
+                       sec.axis = sec_axis(transform = ~ . / 28,
+                                           breaks = seq(0, 5000, 500),
+                                           name = "nmol C / min / g lean mass\n")) +
     coord_cartesian(ylim = c(0, 140*1000)),
   
   #gap
@@ -497,9 +517,18 @@ plt.stacked.bars.OX.NOS.3pheno.ALL <- plot_grid(
     # theme(strip.text = element_blank()) +
     scale_y_continuous(expand = expansion(mult = c(0, .08)),
                        labels = function(x){x/1000},
-                       breaks = seq(0, 140*1000, 20*1000)) +
+                       breaks = seq(0, 140*1000, 20*1000),
+                       position = "right",
+                       sec.axis = sec_axis(transform = ~ . / 28,
+                                           breaks = seq(0, 5000, 500),
+                                           name = "nmol C / min / g lean mass\n")) +
     coord_cartesian(ylim = c(0, 140*1000)) +
-    theme(axis.text = element_text(size = 15)),
+    theme(axis.text = element_text(size = 15),
+          # remove the right (original main y axis elements) on unit of umol/min/animal
+          axis.title.y.right = element_blank(),
+          axis.text.y.right = element_blank(),
+          axis.line.y.right = element_blank(),
+          axis.ticks.y.right = element_blank()),
   
   nrow = 1, rel_widths = c(1.13, .1, 2.7, .06, 2.7)
   
@@ -507,9 +536,9 @@ plt.stacked.bars.OX.NOS.3pheno.ALL <- plot_grid(
 
 plt.stacked.bars.OX.NOS.3pheno.ALL
 
-ggsave(filename = "OX NOS 3 pheno.pdf",
+ggsave(filename = "OX NOS 3 pheno per g lean mass.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 4.2, width = 12)
+       height = 5, width = 13.5)
 
 
 
@@ -649,8 +678,9 @@ ggsave(filename = "reesterification WT.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 3.5, width = 3)
 
-plt.ester.3pheno <-  fun.plt.esterification(dataset = d.reesterified.tidy)
-plt.ester.3pheno
+# per animal
+plt.ester.3pheno <-  fun.plt.esterification(dataset = d.reesterified.tidy) 
+
 ggsave(filename = "reesterification 3 pheno.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 3.5, width = 4)
@@ -740,6 +770,7 @@ func.plt.aa <-  function(p){
     scale_fill_brewer(palette = "Pastel1") 
 }
 
+
 # plot Fcirc  
 plt.fcirc <- d.aa.Fcirc.sink %>%  
   ggplot(aes(x = pct, y = P.nmol.min.anim, fill = status, color = status)) 
@@ -758,6 +789,32 @@ plot_grid(plt.fcirc + ggtitle("total production"),
 ggsave(filename = "amino acid flux vs. content.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
        height = 3.8, width = 7.5)
+
+
+
+# plot direct storage-releasing flux
+d.ala.storageRelease <- d.directFlux_interConversion %>% 
+  filter(phenotype == "WT" & sources == "storage" & targetCompound == "Alanine") %>% 
+  select(nmol.min.animal.mean)
+
+d.storageRelease <- d.aa.Fcirc.sink %>% filter(status == "Essential" | Abbreviation_1 == "Ala") %>% 
+  rename(storage_release.min.animal = P.nmol.min.anim) 
+
+d.storageRelease[d.storageRelease$Abbreviation_1 == "Ala", ]$storage_release.min.animal <- d.ala.storageRelease$nmol.min.animal.mean 
+
+d.storageRelease %>% 
+  ggplot(aes(x = pct, y = storage_release.min.animal, fill = status, color = status)) +
+  geom_smooth(method = "lm", alpha = .3, fill = "grey", color = "black") +
+  geom_point(size = 10) +
+  geom_text(aes(label = Abbreviation_1), color = "black", size = 4) +
+  scale_y_continuous(labels = function(x){x/28} %>% round(),
+                     name = "nmol C / min / g BW \n",
+                     limits = c(0, NA)) +
+  scale_x_continuous(limits = c(0, NA), name = "C percentage") +
+  theme.myClassic +
+  theme(legend.position = "none") +
+  coord_cartesian(clip = "off") +
+  scale_color_brewer(palette = "Pastel1")
 
 
 

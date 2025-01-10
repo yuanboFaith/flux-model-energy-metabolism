@@ -2,12 +2,12 @@
 
 This repository contains the source code and raw data to reproduce the figures and computation in our paper [***An Organism-Level Quantitative Flux Model of Energy Metabolism in Mice***](https://www.biorxiv.org/content/10.1101/2024.02.11.579776v2). 🌟
 
-![](/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/raw data/github summary figure.png)
+![](https://github.com/yuanboFaith/flux-model-energy-metabolism/blob/main/github%20summary%20figure.png?raw=true)
 
 
 The source code is prefixed with numbers **1** to **14**. Run each script sequentially by the prefix. Execution of the so-named core scripts (**1-9**) as well as script **13** generates the associated **.RData** file, which will be imported in the following script.
 
-### **^13^CO~2~ data analysis**
+### **13CO2 data analysis**
 
 The raw data from the metabolic cage-isotope analyzer is in folder **data-13CO2**. Experimental parameters are in **data_13CO2_mouseID_paper.xlsx**. 
 

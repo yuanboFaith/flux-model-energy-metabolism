@@ -1,4 +1,4 @@
-<h1>**An Organism-Level Quantitative Flux Model of Energy Metabolism in Mice**</h1>
+<h1><strong>An Organism-Level Quantitative Flux Model of Energy Metabolism in Mice</strong></h1>
 
 This repository contains the source code and raw data to reproduce the figures and computation in our paper [***An Organism-Level Quantitative Flux Model of Energy Metabolism in Mice***](https://www.biorxiv.org/content/10.1101/2024.02.11.579776v2). 🌟
 

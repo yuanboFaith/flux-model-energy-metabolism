@@ -7,7 +7,7 @@ This repository contains the source code and raw data to reproduce the figures a
 
 The source code is prefixed with numbers **1** to **14**. Run each script sequentially by the prefix. Execution of the so-named core scripts (**1-9**) as well as script **13** generates the associated **.RData** file, which will be imported in the following script.
 
-### **13CO2 data analysis**
+## **13CO2 data analysis**
 
 The raw data from the metabolic cage-isotope analyzer is in folder **data-13CO2**. Experimental parameters are in **data_13CO2_mouseID_paper.xlsx**. 
 
@@ -15,7 +15,7 @@ The raw data from the metabolic cage-isotope analyzer is in folder **data-13CO2*
 - **2_core_13CO2_bolus_injection.R** analyzes bolus-based 13CO2 data.
 - **3_core_13CO2_infusion_physiology_basics.R** analyzes infusion-based 13CO2 data, and integrates all other respirometry data, such as total O2 consumption, CO2 production, RER, energy expenditure, etc. 
 
-### **Serum labeling analysis**
+## **Serum labeling analysis**
 
 The serum labeling raw data is in **data_serum labeling.xlsm**, and the experimental parameters are in **data_serum labeling mouse ID.xlsx**. The following scripts cleans up the labeling data, and performs some simple calculations (e.g., the circulatory turnover flux).  
 
@@ -24,7 +24,7 @@ The serum labeling raw data is in **data_serum labeling.xlsm**, and the experime
 - **5_core_labeling_analysis.R** analyzes serum labeling data, calculate arterial-venous labeling difference, and computes circulatory turnover fluxes.
 
 
-### **Integrated flux analysis**
+## **Integrated flux analysis**
 
 The following scripts performs more advanced computations, such as the metabolites interconversion fluxes, and direct oxidation and futile storing fluxes, etc. 
 

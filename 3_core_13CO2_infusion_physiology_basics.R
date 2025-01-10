@@ -174,11 +174,14 @@ plt.kinetics.infusion.expCurve.modeled_WT +
 
 ggsave(filename = "13CO2 recovery_infusion_WT.pdf", 
        plot = plt.kinetics.infusion.expCurve.modeled_WT + 
-         theme(text = element_text(size = 20),
+         theme(text = element_text(size = 19),
+               strip.text = element_text(size = 22),
+               axis.text = element_text(size = 20),
+               axis.title = element_text(size = 24),
                axis.title.y.left = element_text(margin = margin(r = 15)),
                axis.title.y.right = element_text(margin = margin(l = 5))) + labs(x = "time (h)"), 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       device = "pdf", height = 7, width = 13)
+       device = "pdf", height = 9, width = 15)
 
 
 # plot infusion of glucose to WT

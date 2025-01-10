@@ -349,6 +349,10 @@ plt.art.tail.correctFactor = d.art.vs.tail.ratio %>%
 plt.art.tail.correctFactor 
 
 
+ggsave(filename = "molecule A-V enrichment ratio.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 5.5 * 1.1, width = 9 * 1.1)
+
 
 
 
@@ -546,6 +550,9 @@ plt.art.tail.correctFactor.atomized =
 plt.art.tail.correctFactor.atomized
 
 
+ggsave(filename = "atom average labeling.pdf",
+       path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
+       height = 9, width = 9 * 1.1)
 
 
 
@@ -1214,16 +1221,18 @@ plt.original.labeling.3phenotype <- d.enrich.atom.summary %>%
       mutate(phenotype = factor(phenotype, levels = ordered.phenotype)), 
     aes(y = enrich.atom.corrected), 
     shape = 21, size = .7, alpha = .6, dodge.width = .8, color = "black",
+    width = .1,
     show.legend = F) +
   
-  facet_wrap(~infused.tracer, ncol = 2, scales = "free") +
+  facet_wrap(~ infused.tracer, ncol = 2, scales = "free_y") +
+  geom_hline(yintercept = 0) +
   
   scale_color_manual(values = color.phenotype, labels = function(x){str_replace(x, "WT", "chow")}) +
   scale_fill_manual (values = color.phenotype, labels = function(x){str_replace(x, "WT", "chow")}) +
   scale_y_continuous(expand = expansion(mult = c(0, .1)), 
                      n.breaks = 5) +
   theme.myClassic + 
-  theme(axis.text.x = element_text(angle = 50, hjust = 1, vjust = 1, size = 10),
+  theme(axis.text.x = element_text(angle = 50, hjust = 1, vjust = 1, size = 13),
         panel.spacing = unit(1, "lines"),
         legend.position = "bottom")  +
   labs(title = "Original labeling", 
@@ -1235,7 +1244,7 @@ plt.original.labeling.3phenotype
 ggsave(filename = "original labeling 3 phenotypes.pdf", 
        plot = plt.original.labeling.3phenotype, 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       device = "pdf", height = 12, width = 9)
+       device = "pdf", height = 10, width = 8)
 
 
 

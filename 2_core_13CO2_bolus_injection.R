@@ -378,8 +378,12 @@ plt.kinetics.13C.flx.tailVein.normalized.WT <-
       filter(phenotype == "WT" # & tracer == "Glucose"
       )) +
   scale_color_manual(values = c("black")) +
-  theme(legend.position = "none") +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "tomato")
+  theme(legend.position = "none", 
+        panel.spacing = unit(10, "pt"),
+        axis.text = element_text(size = 18),
+        strip.text = element_text(size = 20)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "tomato") +
+  scale_x_continuous(breaks = seq(0, 6, 1))
 
 plt.kinetics.13C.flx.tailVein.normalized.WT
 
@@ -586,13 +590,19 @@ plt.cumulatedRecovery.eachMouse.WT <-
     mydata = d.all.treated.recovery.timeSections.clean %>% 
       filter(phenotype == "WT")) +
   scale_color_manual(values = "black") +
-  theme(legend.position = "none") 
+  theme(legend.position = "none", 
+        panel.spacing = unit(10, "pt"),
+        axis.text = element_text(size = 18),
+        strip.text = element_text(size = 20)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "tomato") +
+  scale_x_continuous(breaks = seq(0, 6, 1))
+  
 plt.cumulatedRecovery.eachMouse.WT
 
 ggsave(filename = "13CO2 accumulated recovery_bolus_WT.pdf", 
        plot = plt.cumulatedRecovery.eachMouse.WT, 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       device = "pdf", height = 5, width = 10)
+       device = "pdf", height = 6, width = 12)
 
 
 # show only WT with glucose injection

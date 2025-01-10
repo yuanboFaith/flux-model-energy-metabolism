@@ -92,11 +92,14 @@ p3 <- d.clamp.ALL %>%
   scale_fill_manual(values = c("steelblue2", "tomato", "tomato"))
 p3
 
-plot_grid(p1, p2, p3, rel_widths = c(2, 2.8, 2.8), nrow = 1)
+plot_grid(p1, ggplot() + theme_void(),
+          p2, ggplot() + theme_void(),
+          p3, 
+          rel_widths = c(2, .7, 2.8, .7, 2.8), nrow = 1)
 
 ggsave(filename = "Clamp.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 4, width = 9)
+       height = 3, width = 9)
 
 # t test of lipolysis suppression
 d.clamp.ALL %>% filter(Index == "Endo_Ra" & Compound == "C16:0") %>% 
@@ -132,7 +135,7 @@ d.gly.ins %>%
 
 ggsave(filename = "Clamp_glycemia_insulin.pdf",
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 3.5, width = 9)
+       height = 2.5, width = 9)
 
 
 
@@ -488,7 +491,7 @@ params[["k"]] * V * (.35 * 3) / 25 # nmol/g/min
 
 
 # 5. flux comparison with the literature data
-  
+
 d <- read_excel(
   "/Users/boyuan/Desktop/Harvard/Research/db db mice/Infusion data/flux comparision.xlsx")
 
@@ -701,7 +704,7 @@ dwnC %>%
   geom_errorbar(aes(ymin = nmol.min.g.SEM.Y.axis.position - nmol.min.g.SEM,
                     ymax = nmol.min.g.SEM.Y.axis.position),
                 width = .3, size = .5) +
-  facet_wrap(~targetCompound, scales = "free", nrow = 2) +
+  facet_wrap(~targetCompound, scales = "free", nrow = 1) +
   # scale_color_manual(values = color.Compounds) +
   scale_fill_manual(values = color.Compounds, guide = guide_legend(reverse=T)) +
   scale_y_continuous(expand = expansion(mult = c(0, .1)), n.breaks = 7) +
@@ -711,7 +714,9 @@ dwnC %>%
   geom_hline(yintercept = 0, linewidth = 1) +
   theme.myClassic +
   theme(axis.title.x = element_blank(),
-        axis.text.x = element_text(size = 14),
+        strip.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 17),
         axis.line.x.bottom = element_blank(),
         # axis.text.x = element_text(size = 10),
         panel.spacing = unit(20, "pt"),
@@ -719,11 +724,12 @@ dwnC %>%
         # legend.position = c(.93, .23)
   ) +
   guides(fill = guide_legend(reverse = F)) +
-  labs(y = "nmol C / min / g\n", fill = "sources")
+  labs(y = "nmol C / min / g\n", fill = "sources")+
+  coord_cartesian(clip = "off")
 
 ggsave(filename = "flux comparison constraints.pdf", 
        path = "/Users/boyuan/Desktop/Harvard/Manuscript/1. fluxomics/R Figures",
-       height = 6, width = 10)
+       height = 3.5, width = 20)
 
 
 
